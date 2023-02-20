@@ -42,7 +42,7 @@
      :parameters (?a - agent)
      :precondition
         (and (> (xloc ?a) 1)
-            (= (get-index walls (yloc ?a) (- (xloc ?a) 1)) false) ##
+            (= (get-index walls (yloc ?a) (- (xloc ?a) 1)) false)
             (not (exists (?d - door)
                 (and (locked ?d) (= (yloc ?a) (yloc ?d)) (= (- (xloc ?a) 1) (xloc ?d))))))
      :effect (decrease (xloc ?a) 1)
