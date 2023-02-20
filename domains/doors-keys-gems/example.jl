@@ -11,13 +11,13 @@ include("render.jl")
 PDDL.Arrays.register!()
 
 # Load domain and problem
-path = joinpath(dirname(pathof(Plinf)), "..", "domains", "doors-keys-gems")
+path = joinpath(dirname(pathof(Plinf)), "..", "domains", "multi-agent")
 domain = load_domain(joinpath(path, "domain.pddl"))
 problem = load_problem(joinpath(path, "problem-6.pddl"))
 
 # Initialize state, set goal and goal colors
 state = initstate(domain, problem)
-start_pos = (state[pddl"xpos"], state[pddl"ypos"])
+start_pos = (state[pddl"(xloc human)"], state[pddl"(yloc human)"])
 goal = [problem.goal]
 goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF"]
 gem_terms = @pddl("gem1", "gem2", "gem3")
@@ -35,7 +35,7 @@ anim = anim_traj(traj; gem_colors=gem_colors, plan=plan)
 @assert satisfy(domain, traj[end], goal) == true
 
 # Visualize full horizon probabilistic A* search
-planner = ProbAStarPlanner(heuristic=GemHeuristic(), trace_states=true)
+planner = ProbAStarPlanner(heuristic=GoalCountHeuristic(), trace_states=true)
 plt = render(state; start=start_pos, gem_colors=gem_colors, show_objs=true)
 tr = Gen.simulate(sample_plan, (planner, domain, state, goal))
 anim = anim_plan(tr, plt)
