@@ -4,6 +4,8 @@ export is_goal, is_violated, get_cost, get_reward
 "Abstract specification for a planning problem"
 abstract type Specification end
 
+
+
 "Check if `state` is a goal state according to the specification."
 is_goal(spec::Specification, domain::Domain, state::State) =
     error("Not implemented.")

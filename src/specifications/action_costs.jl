@@ -1,8 +1,9 @@
 export MinActionCosts, ExtraActionCosts
+     
 
 "Goal specification with action-specific costs."
 struct MinActionCosts{C <: NamedTuple} <: Goal
-    terms::Vector{Term} # Goal terms to be satisfied
+    terms::Vector{Compound} # Goal terms to be satisfied
     costs::C # Named tuple of action costs
 end
 
@@ -50,6 +51,13 @@ function ExtraActionCosts(spec::Specification; costs...)
     costs = collect(values(costs))
     return ExtraActionCosts(spec, actions, costs)
 end
+
+# "Convert goal object to goal specification."
+# function goal_object_spec(goal_obj::Const)
+#     goal = Compound(:has, Term[goal_obj])
+#     return MinActionCosts(Term[goal], ACTION_COSTS)
+# end
+
 
 Base.hash(spec::ExtraActionCosts, h::UInt) =
     hash(spec.costs, hash(spec.spec, h))

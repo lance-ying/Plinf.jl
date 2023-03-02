@@ -1,7 +1,7 @@
 (define (domain doors-keys-gems)
     (:requirements :fluents :adl :typing)
-    (:types key gem - item door agent - object)
-    (:predicates (has ?a - agent ?i - item) (offgrid ?i - item) (locked ?d - door))
+    (:types key gem - item color door agent - object)
+    (:predicates (has ?a - agent ?i - item)(iscolor ?d - door ?c - color) (iscolor ?k - key ?c - color) (offgrid ?i - item) (locked ?d - door))
     (:functions (xloc ?a - agent) (yloc ?a - agent) - integer
                 (xloc ?o - object) (yloc ?o - object) - integer
                 (walls) - bit-matrix)
@@ -12,8 +12,9 @@
                   (assign (xloc ?i) -1) (assign (yloc ?i) -1))
     )
     (:action unlock
-     :parameters (?a - agent ?k - key ?d - door)
+     :parameters (?a - agent ?k - key ?d - door ?c - color)
      :precondition (and (has ?a ?k) (locked ?d)
+                        (exists (?c - color) (and (iscolor ?k ?c) (iscolor ?d ?c)))
                         (or (and (= (xloc ?a) (xloc ?d)) (= (- (yloc ?a) 1) (yloc ?d)))
                             (and (= (xloc ?a) (xloc ?d)) (= (+ (yloc ?a) 1) (yloc ?d)))
                             (and (= (- (xloc ?a) 1) (xloc ?d)) (= (yloc ?a) (yloc ?d)))
@@ -65,5 +66,9 @@
                 (and (= (- (xloc ?a) 1) (xloc ?b)) (= (yloc ?a) (yloc ?b)))
                 (and (= (+ (xloc ?a) 1) (xloc ?b)) (= (yloc ?a) (yloc ?b)))))
      :effect (and (not (has ?a ?o)) (has ?b ?o))
+    )
+    (:action wait
+     :parameters (?a - agent)
+     :effect (and)
     )
 )
