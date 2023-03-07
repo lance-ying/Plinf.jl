@@ -8,7 +8,7 @@ include("render.jl")
 #--- Initial Setup ---#
 
 costs =
-    (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, wait=0.2)
+    (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.2)
 
 # Register PDDL array theory
 PDDL.Arrays.register!()
@@ -20,7 +20,7 @@ problem = load_problem(joinpath(path, "problem-6.pddl"))
 
 # Initialize state, set goal and goal colors
 state = initstate(domain, problem)
-start_pos = (state[pddl"(xloc human)"], state[pddl"(yloc human)"])
+start_pos = [(state[pddl"(xloc human)"], state[pddl"(yloc human)"]), (state[pddl"(xloc robot)"], state[pddl"(yloc robot)"])]
 goal = [problem.goal]
 spec = MinActionCosts(goal, costs)
 goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF"]
@@ -37,7 +37,7 @@ display(plan)
 plt = render(state; start=start_pos, plan=plan, gem_colors=gem_colors)
 anim = anim_traj(traj; gem_colors=gem_colors, plan=plan)
 @assert satisfy(domain, traj[end], goal) == true
-execute(domain, state, (pddl"exists (?c - color) ((and (is door1 ?c) (is key1 ?c))))"))
+
 # Visualize full horizon probabilistic A* search
 planner = ProbAStarPlanner(heuristic=GoalCountHeuristic(), trace_states=true)
 plt = render(state; start=start_pos, gem_colors=gem_colors, show_objs=true)
