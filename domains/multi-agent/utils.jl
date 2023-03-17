@@ -3,14 +3,25 @@ using DataStructures: OrderedDict
 pos_to_terms(pos) = @julog([xpos == $(pos[1]), ypos == $(pos[2])])
 
 function get_agent_pos(state::State; flip_y::Bool=false)
-    x, y = state[pddl"(xpos)"], state[pddl"(ypos)"]
+    x_human, y_human = state[pddl"(xpos human)"], state[pddl"(ypos human)"]
+    x_robot, y_robot = state[pddl"(xpos robot)"], state[pddl"(ypos robot)"]
     if !flip_y
-        return (x, y)
+        return Dict("human"=>(x_human, y_human), "robot"=>(x_robot, y_robot))
     else
         height = size(state[pddl"(walls)"])[1]
-        return (x, height-y+1)
+        return Dict("human"=>(x_human, height-y_human+1), "robot"=>(x_robot, height-y_robot+1))
     end
 end
+
+function get_color(state::State, obj::Const)
+    color_vec=PDDL.get_objects(state, :color)
+    for c in color_vec
+        if state[Compound(:iscolor, Term[obj,c])]
+            return c
+        end
+    end
+end
+
 
 function get_obj_loc(state::State, obj::Const; flip_y::Bool=false)
     x, y = state[Compound(:xloc, Term[obj])], state[Compound(:yloc, Term[obj])]

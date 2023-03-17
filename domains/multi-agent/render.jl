@@ -12,15 +12,24 @@ function state_to_array(state::State)
 end
 
 "Convert PDDL plan to trajectory in a gridworld."
-function plan_to_traj(plan::Vector{Term}, start::Tuple{Int,Int})
-    traj = [collect(start)]
+function plan_to_traj(plan::Vector{Term}, start_human::Tuple{Int,Int},start_robot::Tuple{Int,Int})
+    traj_human = [collect(start_human)]
+    traj_robot = [collect(start_robot)]
+
     dirs = Dict(:up => [0, 1], :down => [0, -1],
                 :left => [-1, 0], :right => [1, 0])
     for act in plan
-        next = traj[end] + get(dirs, act.name, [0, 0])
-        push!(traj, next)
+        if act.args[1].name==:human
+            next_human = traj_human[end] + get(dirs, act.name, [0, 0])
+            next_robot = traj_robot[end]
+        else
+            next_robot = traj_robot[end] + get(dirs, act.name, [0, 0])
+            next_human = traj_human[end]
+        end
+        push!(traj_human, next_human)
+        push!(traj_robot, next_robot)
     end
-    return traj
+    return traj_human,traj_robot
 end
 
 ## Object rendering functions ##
@@ -32,6 +41,14 @@ function make_circle(x::Real, y::Real, r::Real)
     xs, ys = xs .+ x, ys .+ y
     return Shape(xs, ys)
 end
+
+# "Make a circle as a Plots.jl shape."
+# function make_robot(x::Real, y::Real, r::Real)
+#     pts = Plots.partialcircle(0, 2*pi, 100, r)
+#     xs, ys = Plots.unzip(pts)
+#     xs, ys = xs .+ x, ys .+ y
+#     return Shape(xs, ys)
+# end
 
 "Make a circle as a Plots.jl shape."
 function make_triangle(x::Real, y::Real, r::Real, dir::Symbol)
@@ -56,7 +73,7 @@ end
 function render_door!(x::Real, y::Real, scale::Real; color=:gray, alpha=1,
                       plt=nothing)
     plt = (plt == nothing) ? plot!() : plt
-    color = isa(color, Symbol) ? HSV(Colors.parse(Colorant, color)) : HSV(color)
+    color = isa(color, Const) ? HSV(Colors.parse(Colorant, color.name)) : HSV(color)
     inner_col = HSV(color.h, 0.8*color.s, min(1.25*color.v, 1))
     door = make_door(x, y, scale)
     plot!(plt, door, alpha=alpha, linealpha=[0 1 0 0], legend=false,
@@ -79,6 +96,8 @@ function render_key!(x::Real, y::Real, scale::Real; color=:goldenrod1, alpha=1,
     plt = (plt == nothing) ? plot!() : plt
     key = make_key(x, y, scale)
     shadow = make_key(x+0.05*scale, y-0.05*scale, scale)
+    color = isa(color, Const) ? HSV(Colors.parse(Colorant, color.name)) : isa(color, Symbol) ? HSV(Colors.parse(Colorant, color)) : HSV(color)
+    # inner_col = HSV(color.h, 0.6*color.s, min(1.5*color.v, 1))
     plot!(plt, [shadow key], alpha=alpha, linealpha=0, legend=false,
           color=[fill(:black, 1, 4) fill(color, 1, 4)])
 end
@@ -97,27 +116,37 @@ function render_gem!(x::Real, y::Real, scale::Real; color=:magenta, alpha=1,
                      plt=nothing)
     plt = (plt == nothing) ? plot!() : plt
     outer, inner = make_gem(x, y, scale)
-    color = isa(color, Symbol) ? HSV(Colors.parse(Colorant, color)) : HSV(color)
+
+    color = isa(color, Const) ? HSV(Colors.parse(Colorant, color.name)) : HSV(color)
     inner_col = HSV(color.h, 0.6*color.s, min(1.5*color.v, 1))
-    plot!(plt, [outer, inner], color=[color inner_col],
-          alpha=alpha, linealpha=[1 0], legend=false)
+    plot!(plt, [outer, inner], color=[color inner_col], alpha=alpha, linealpha=[1 0], legend=false)
 end
 
 ## Gridworld rendering functions ##
 
 "Plot agent's current location."
 function render_pos!(state::State, plt=nothing;
-                     radius=0.25, color=:red, alpha=1, dir=nothing, kwargs...)
+                     radius=0.25, t, color=Dict("human"=>:red, "robot"=>:blue), alpha=1, dir=nothing, kwargs...)
     plt = (plt == nothing) ? plot!() : plt
-    x, y = get_agent_pos(state, flip_y=true)
+    x_human, y_human = get_agent_pos(state, flip_y=true)["human"]
+    x_robot, y_robot = get_agent_pos(state, flip_y=true)["robot"]
+
     if dir in [:up, :down, :right, :left]
-        marker = make_triangle(x, y, radius*1.5, dir)
-        xscale, yscale = (dir in [:up, :down]) ? (0.8, 1.0) : (1.0, 0.8)
-        Plots.scale!(marker, xscale, yscale)
+        print(t)
+        if t%2==1
+            marker_human = make_triangle(x_human, y_human, radius*1.5, dir)
+            marker_robot = make_circle(x_robot, y_robot, radius)
+        else
+            marker_robot = make_triangle(x_robot, y_robot, radius*1.5, dir)
+            marker_human = make_circle(x_human, y_human, radius)
+        end
+        # xscale, yscale = (dir in [:up, :down]) ? (0.8, 1.0) : (1.0, 0.8)
+        # Plots.scale!(marker, xscale, yscale)
     else
-        marker = make_circle(x, y, radius)
+        marker_human = make_circle(x_human, y_human, radius)
+        marker_robot = make_circle(x_robot, y_robot, radius)
     end
-    plot!(plt, marker, color=color, alpha=alpha, linealpha=0, legend=false)
+    plot!(plt, [marker_human,  marker_robot], color=[color["human"], color["robot"]], alpha=alpha, linealpha=0, legend=false)
 end
 
 "Render doors, keys and gems present in the given state."
@@ -125,64 +154,74 @@ function render_objects!(state::State, plt=nothing;
                          gem_colors=cgrad(:plasma)[1:3:30], kwargs...)
     # Set up object colors and renderers for each type
     obj_types = [:door, :key, :gem]
-    obj_colors = [:gray, :goldenrod1, gem_colors]
     obj_filters = [
         o -> state[Compound(:locked, Term[o])],
         o -> !state[Compound(:has, Term[o])],
         o -> !state[Compound(:has, Term[o])]
     ]
     obj_renderers = [
-        (l, c) -> render_door!(l[1], l[2], 0.7, plt=plt),
-        (l, c) -> render_key!(l[1], l[2], 0.4, plt=plt),
+        (l, c) -> render_door!(l[1], l[2], 0.7, color=c, plt=plt),
+        (l, c) -> render_key!(l[1], l[2], 0.4, color=c, plt=plt),
         (l, c) -> render_gem!(l[1], l[2], 0.3, color=c, plt=plt)
     ]
     # Render each object not in inventory
-    for (type, colors, filt, rndr!) in zip(obj_types, obj_colors,
+    for (type, filt, rndr!) in zip(obj_types,
                                            obj_filters, obj_renderers)
         objs = filter!(filt, sort!(PDDL.get_objects(state, type), by=string))
+
         locs = [get_obj_loc(state, o, flip_y=true) for o in objs]
-        if isa(colors, AbstractDict)
-            colors = [colors[o] for o in objs]
-        elseif !isa(colors, AbstractArray)
-            colors = fill(colors, length(locs))
+
+        if type==:gem
+            colors = [gem_colors[o] for o in objs]
+        else
+            colors=[get_color(state, o) for o in objs]
         end
-        for (loc, col) in zip(locs, colors) rndr!(loc, col) end
+
+        for (loc, col) in zip(locs, colors) 
+            rndr!(loc, col)
+        end
     end
     return plt
 end
 
 "Render agent inventory as a bar below the gridworld."
-function render_inventory!(state::State, plt=nothing;
-                           gem_colors=cgrad(:plasma)[1:3:30], kwargs...)
+function render_inventory!(state::State, plt=nothing; agent="human",
+                           gem_colors=cgrad(:plasma)[1:3:30], objs=nothing, kwargs...)
     if (plt == nothing)
         plt = plot(size=(600,100), framestyle=:box, aspect_ratio=1, grid=true,
                    margin=0*Plots.mm, top_margin=2*Plots.mm)
     end
     # Set up object colors and renderers for each type
     obj_types = [:key, :gem]
-    obj_colors = [:goldenrod1, gem_colors]
     obj_renderers = [
-        (l, c) -> render_key!(l[1], l[2], 0.4, plt=plt),
+        (l, c) -> render_key!(l[1], l[2], 0.4, color=c, plt=plt),
         (l, c) -> render_gem!(l[1], l[2], 0.3, color=c, plt=plt)
     ]
     # Render each object in inventory
     offset = 0
-    for (type, colors, rndr!) in zip(obj_types, obj_colors, obj_renderers)
-        objs = sort!(PDDL.get_objects(state, type), by=string)
-        filter!(o -> state[Compound(:has, Term[o])], objs)
-        if isa(colors, AbstractDict)
-            colors = [colors[o] for o in objs]
-        elseif !isa(colors, AbstractArray)
-            colors = fill(colors, length(objs))
+    for (type, rndr!) in zip(obj_types, obj_renderers)
+        if agent=="human"
+            objs = sort!(PDDL.get_objects(state, type), by=string)
+            filter!(o -> state[Compound(:has, Term[Const(:human), o])], objs)
+        else
+            objs = sort!(PDDL.get_objects(state, type), by=string)
+            filter!(o -> state[Compound(:has, Term[Const(:robot), o])], objs)
         end
-        for (i, col) in enumerate(colors) rndr!((offset+i, 0.5), col) end
+        if type==:gem
+            colors = [gem_colors[o] for o in objs]
+        else
+            colors = [get_color(state, o) for o in objs]
+        end
+        for (i, col) in enumerate(colors) 
+            rndr!((offset+i, 0.5), col) 
+        end
         offset += length(objs)
     end
     # Render inventory grid
     width = size(state[pddl"(walls)"], 2)
     plot!(plt, xticks=(collect(0:width+1) .- 0.5, []), yticks=([0, 1.0], []))
     xgrid!(plt, :on, :black, 1, :dash, 0.75)
-    annotate!(0.5, 1.25, Plots.text("Inventory", 12, :black, :left))
+    annotate!(0.5, 1.25, Plots.text("Inventory_human", 12, :black, :left))
     xlims!(plt, 0.5, width+0.5)
     ylims!(plt, 0, 1)
     return plt
@@ -203,8 +242,10 @@ function render!(state::State, plt=nothing; start=nothing, plan=nothing,
     cmap = cgrad([RGBA(1,1,1,0), RGBA(0,0,0,1)])
     heatmap!(plt, array, aspect_ratio=1, color=cmap, colorbar_entry=false)
     # Plot start position
-    if isa(start, Tuple{Int,Int})
-        annotate!(start[1], h-start[2]+1, Plots.text("start", 16, :red, :center))
+    if isa(start, Dict{String, Tuple{Int,Int}})
+        annotate!(start["human"][1], h-start["human"][2]+1, Plots.text("human", 16, :red, :center))
+        annotate!(start["robot"][1], h-start["robot"][2]+1, Plots.text("robot", 16, :blue, :center))
+
     end
     # Plot objects
     if show_objs render_objects!(state, plt; gem_colors=gem_colors) end
@@ -218,9 +259,10 @@ function render!(state::State, plt=nothing; start=nothing, plan=nothing,
     xlims!(plt, 0.5, w+0.5)
     ylims!(plt, 0.5, h+0.5)
     if show_inventory
-        i_plt = render_inventory!(state; gem_colors=gem_colors)
-        sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]]
-        plt = plot(plt, i_plt; size=sz, layout=grid(2,1, heights=[0.9, 0.1]))
+        i_plt = render_inventory!(state; agent="human",gem_colors=gem_colors)
+        i_plt_r = render_inventory!(state; agent="robot",gem_colors=gem_colors)
+        sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]+i_plt_r[:size][2]]
+        plt = plot(plt, i_plt, i_plt_r; size=sz, layout=grid(2,1, heights=[0.9, 0.1]))
     end
     return plt
 end
@@ -230,26 +272,36 @@ function render(state::State; kwargs...)
     return render!(state, plot(size=(600,600), framestyle=:box); kwargs...)
 end
 
-function render_plan!(state::State, plan, start::Tuple{Int,Int}, plt=nothing;
-                      alpha::Float64=1.0, color=:red, radius=0.1,
+function render_plan!(state::State, plan, start::Dict{String, Tuple{Int,Int}}, plt=nothing;
+                      alpha::Float64=1.0, color=[:red,:blue], radius=0.1,
                       fade=false, trunc=nothing, kwargs...)
     # Get last plot if not provided
     plt = (plt == nothing) ? plot!() : plt
     # Transform coordinate system
     height = size(state[pddl"walls"], 1)
-    start = (start[1], height-start[2]+1)
-    traj = plan_to_traj(plan, start)
+    start_human = (start["human"][1], height-start["human"][2]+1)
+    start_robot = (start["robot"][1], height-start["robot"][2]+1)
+    traj_human,traj_robot = plan_to_traj(plan, start_human, start_robot)
+    # print(traj_human,traj_robot)
     if trunc != nothing && length(plan) >= trunc
-        plan, traj = plan[end-trunc+1:end], traj[end-trunc:end-1] end
+        plan, traj_human, traj_robot = plan[end-trunc+1:end], traj_human[end-trunc:end-1],traj_robot[end-trunc:end-1] end
     i_alpha = fade ? 0.0 : alpha
-    for (act, (x, y)) in zip(plan, traj)
+    for (act, (x_h, y_h), (x_r, y_r)) in zip(plan, traj_human,traj_robot)
         if fade i_alpha += alpha / length(plan) end
         if (act.name in [:up, :down, :right, :left])
-            marker = make_triangle(x, y, radius*1.5, act.name)
+            if act.args[1].name==:human
+                marker_human = make_triangle(x_h, y_h, radius*1.5, act.name)
+                marker_robot = make_circle(x_r, y_r, radius)
+            else
+                marker_robot = make_triangle(x_r, y_r, radius*1.5, act.name)
+                marker_human = make_circle(x_h, y_h, radius)
+            end
+
         else
-            marker = make_circle(x, y, radius)
+            marker_human = make_circle(x_h, y_h, radius)
+            marker_robot = make_circle(x_r, y_r, radius)
         end
-        plot!(plt, marker, color=color, la=0, alpha=i_alpha, legend=false)
+        plot!(plt, [marker_human, marker_robot], color=color, la=0, alpha=i_alpha, legend=false)
     end
     return plt
 end
@@ -320,26 +372,29 @@ function anim_traj(traj::AbstractVector{<:State}, canvas=nothing, animation=noth
     animation = animation == nothing ? Animation() : animation
     splitflag = length(splitpoints) > 0
     splitanims, splitpoints = Animation[], collect(splitpoints)
-    start_pos = start_pos == nothing ?
-        (traj[1][pddl"xpos"], traj[1][pddl"ypos"]) : start_pos
+    # start_pos = start_pos == nothing ?
+    #     (traj[1][pddl"xloc human"], traj[1][pddl"yloc human"]) : start_pos
     dir = start_dir
     for (t, state) in enumerate(traj)
         plt = deepcopy(canvas)
         if !isnothing(plan) # Render past actions if provided
             part_plan = plan[1:max(1,min(t-1, length(plan)))]
             render_plan!(state, part_plan, start_pos, plt;
-                         fade=true, trunc=6, color=:black)
+                         fade=true, trunc=6)
             i = findlast(a -> a.name in [:up, :down, :left, :right], part_plan)
             dir = i == nothing ? start_dir : part_plan[i].name
         end
-        render_pos!(state, plt; dir=dir, kwargs...) # Render position
+        render_pos!(state, plt; dir=dir, t=t, kwargs...) # Render position
         if show_objs # Render objcets
             render_objects!(state, plt; kwargs...) end
         if show_inventory # Render inventory
-            i_plt = render_inventory!(state; kwargs...)
+            i_plt = render_inventory!(state; agent="human",kwargs...)
+            i_plt_r = render_inventory!(state; agent="robot",kwargs...)
             sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]]
-            plt = plot(plt, i_plt; size=sz,
+            plt = plot(plt, i_plt, i_plt_r; size=sz,
                        layout=grid(2,1, heights=[0.9, 0.1]))
+            plt = plot(plt, i_plt_r; size=sz,
+                       layout=grid(2,1, heights=[0.9, 0.1]))         
         end
         frame(animation)
         push!(frames, deepcopy(plt))
@@ -369,13 +424,14 @@ function anim_traj(trajs, canvas=nothing, animation=nothing;
         plt = deepcopy(canvas)
         for traj in trajs
             state = t <= length(traj) ? traj[t] : traj[end]
-            render_pos!(state, plt; kwargs...)
+            render_pos!(state, plt, t; kwargs...)
             if show_objs
                 render_objects!(state, plt; kwargs...) end
             if show_inventory && length(trajs) == 1
-                i_plt = render_inventory!(state; kwargs...)
-                sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]]
-                plt = plot(plt, i_plt; size=sz,
+                i_plt = render_inventory!(state; agent="human",kwargs...)
+                i_plt_r = render_inventory!(state; agent="robot",kwargs...)
+                sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]+ i_plr[:size][2]]
+                plt = plot(plt, i_plt, i_plt_r; size=sz,
                            layout=grid(2,1, heights=[0.9, 0.1]))
             end
         end
@@ -397,8 +453,10 @@ function anim_plan(trace, canvas, animation=nothing; show=true, fps=10,
     sort!(filter!(p -> p[1][1] == :state, node_choices))
     # Render each node expanded in sequence
     for state in values(node_choices)
-        x, y = get_agent_pos(state, flip_y=true)
-        dot = make_circle(x, y, node_radius)
+        x_human, y_human = get_agent_pos(state, flip_y=true)["human"]
+        x_robot, y_robot = get_agent_pos(state, flip_y=true)["robot"]
+        dot_human = make_circle(x, y, node_radius)
+        dot_human = make_circle(x, y, node_radius)
         plt = plot!(plt, dot, color=search_color, alpha=search_alpha,
                     linealpha=0, legend=false)
         frame(animation, plt)
@@ -539,7 +597,7 @@ function render_cb(t::Int, state, traces, weights;
     if !isnothing(plan) # Render past actions if provided
         plan = plan[1:max(1,min(t-1, length(plan)))]
         render_plan!(state, plan, start_pos, plt;
-                     fade=true, trunc=6, color=:black)
+                     fade=true, trunc=6)
         i = findlast(a -> a.name in [:up, :down, :left, :right], plan)
         dir = i == nothing ? start_dir : plan[i].name
     end
@@ -548,9 +606,10 @@ function render_cb(t::Int, state, traces, weights;
     render_traces!(traces, weights, plt; kwargs...) # Render trajectories
     title!(plt, "t = $t")
     if show_inventory
-        i_plt = render_inventory!(state; kwargs...)
-        sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]]
-        plt = plot(plt, i_plt; size=sz, layout=grid(2,1, heights=[0.9, 0.1]))
+        i_plt = render_inventory!(state; agent="human",kwargs...)
+        i_plt_r = render_inventory!(state; agent="robot",kwargs...)
+        sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]+ i_plr[:size][2]]
+        plt = plot(plt, i_plt, i_plt_r; size=sz, layout=grid(2,1, heights=[0.9, 0.1]))
     end
     return plt
 end

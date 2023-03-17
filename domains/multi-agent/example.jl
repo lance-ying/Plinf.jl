@@ -11,14 +11,15 @@ include("render.jl")
 PDDL.Arrays.register!()
 
 # Load domain and problem
-path = joinpath(dirname(pathof(Plinf)), "..", "domains", "doors-keys-gems")
+path = joinpath(dirname(pathof(Plinf)), "..", "domains", "multi-agent")
 domain = load_domain(joinpath(path, "domain.pddl"))
 problem = load_problem(joinpath(path, "problem-6.pddl"))
 
 # Initialize state, set goal and goal colors
 state = initstate(domain, problem)
-start_pos = (state[pddl"xpos"], state[pddl"ypos"])
+start_pos = Dict("human"=>(state[pddl"(xloc human)"], state[pddl"(yloc human)"]), "robot"=>(state[pddl"(xloc robot)"], state[pddl"(yloc robot)"]))
 goal = [problem.goal]
+spec = MinActionCosts(goal, costs)
 goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF"]
 gem_terms = @pddl("gem1", "gem2", "gem3")
 gem_colors = Dict(zip(gem_terms, goal_colors))
@@ -26,8 +27,8 @@ gem_colors = Dict(zip(gem_terms, goal_colors))
 #--- Visualize Plans ---#
 
 # Check that A* heuristic search correctly solves the problem
-planner = AStarPlanner(heuristic=GemHeuristic())
-plan, traj = planner(domain, state, goal)
+planner = AStarPlanner(heuristic=goalCountHeuristic())
+plan, traj = planner(domain, state, spec)
 println("== Plan ==")
 display(plan)
 plt = render(state; start=start_pos, plan=plan, gem_colors=gem_colors)
