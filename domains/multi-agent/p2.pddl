@@ -1,10 +1,35 @@
+; WWWWWGWWWWWWWW
+; WWWWW.WWWWWWWW
+; WWWWWDWWWWWWWW
+; WG.......GWWWW
+; W.WWWWWWW.WWWW
+; WDWWWWWWWDWWWW
+; k............D
+; WWWDWWWWWWWWWW
+; WWW.WWWWWWkWWW
+; h..........r.k
+; WWW.WWWWWW.WWW
+; WWW.WWWWWWDWWW
+; Wk..WWWWWW.D.G
 (define (problem doors-keys-gems-problem)
   (:domain doors-keys-gems)
   (:objects door1 door2 door3 door4 door5 door6 door7 - door
             key1 key2 key3 key4 - key
             gem1 gem2 gem3 gem4 - gem
+            red blue yellow - color
             human robot - agent)
   (:init (= (walls) (new-bit-matrix false 14 13))
+         (iscolor key1 red)
+         (iscolor key2 blue)
+         (iscolor key3 red)
+         (iscolor key4 yellow)
+         (iscolor door1 red)
+         (iscolor door2 blue)
+         (iscolor door3 yellow)
+         (iscolor door4 red)
+         (iscolor door5 red)
+         (iscolor door6 blue)
+         (iscolor door7 yellow)
          (= (agentcode human) 0)
          (= (agentcode robot) 1)
          (= (turn) 0)

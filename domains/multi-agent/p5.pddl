@@ -1,3 +1,11 @@
+; ..GWWWWW
+; ..WWWW.k
+; .WWWWk..
+; .gWWWWrW
+; DWWWWWDW
+; ...h....
+; WWW.WWWW
+; gD.....g
 (define (problem doors-keys-gems-problem)
   (:domain doors-keys-gems)
   (:objects door1 door2 door3 - door
@@ -6,7 +14,11 @@
             red yellow - color
             human robot - agent)
   (:init (= (walls) (new-bit-matrix false 8 8))
-
+         (iscolor key1 red)
+         (iscolor key2 yellow)
+         (iscolor door1 red)
+         (iscolor door2 yellow)
+         (iscolor door3 red)
          (= (agentcode human) 0)
          (= (agentcode robot) 1)
          (= (turn) 0)

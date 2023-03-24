@@ -221,7 +221,11 @@ function render_inventory!(state::State, plt=nothing; agent="human",
     width = size(state[pddl"(walls)"], 2)
     plot!(plt, xticks=(collect(0:width+1) .- 0.5, []), yticks=([0, 1.0], []))
     xgrid!(plt, :on, :black, 1, :dash, 0.75)
-    annotate!(0.5, 1.25, Plots.text("Inventory_human", 12, :black, :left))
+    if agent=="human"
+        annotate!(0.5, 1.25, Plots.text("Inventory_human", 12, :black, :left))
+    else
+        annotate!(0.5, 1.25, Plots.text("Inventory_robot", 12, :black, :left))
+    end
     xlims!(plt, 0.5, width+0.5)
     ylims!(plt, 0, 1)
     return plt
@@ -391,7 +395,7 @@ function anim_traj(traj::AbstractVector{<:State}, canvas=nothing, animation=noth
             i_plt = render_inventory!(state; agent="human",kwargs...)
             i_plt_r = render_inventory!(state; agent="robot",kwargs...)
             sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]]
-            plt = plot(plt, i_plt, i_plt_r; size=sz,
+            plt = plot(plt, i_plt; size=sz,
                        layout=grid(2,1, heights=[0.9, 0.1]))
             plt = plot(plt, i_plt_r; size=sz,
                        layout=grid(2,1, heights=[0.9, 0.1]))         
@@ -430,8 +434,11 @@ function anim_traj(trajs, canvas=nothing, animation=nothing;
             if show_inventory && length(trajs) == 1
                 i_plt = render_inventory!(state; agent="human",kwargs...)
                 i_plt_r = render_inventory!(state; agent="robot",kwargs...)
-                sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]+ i_plr[:size][2]]
-                plt = plot(plt, i_plt, i_plt_r; size=sz,
+                sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]]
+                sz_r = [plt[:size][1], plt[:size][2] + i_plt_r[:size][2]]
+                plt = plot(plt, i_plt; size=sz,
+                           layout=grid(2,1, heights=[0.9, 0.1]))
+                plt = plot(plt, i_plt_r; size=sz_r,
                            layout=grid(2,1, heights=[0.9, 0.1]))
             end
         end
@@ -608,8 +615,10 @@ function render_cb(t::Int, state, traces, weights;
     if show_inventory
         i_plt = render_inventory!(state; agent="human",kwargs...)
         i_plt_r = render_inventory!(state; agent="robot",kwargs...)
-        sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]+ i_plr[:size][2]]
-        plt = plot(plt, i_plt, i_plt_r; size=sz, layout=grid(2,1, heights=[0.9, 0.1]))
+        sz = [plt[:size][1], plt[:size][2] + i_plt[:size][2]]
+        sz_r = [plt[:size][1], plt[:size][2] + i_plt_r[:size][2]]
+        plt = plot(plt, i_plt; size=sz, layout=grid(2,1, heights=[0.9, 0.1]))
+        plt = plot(plt, i_plt_r; size=sz_r, layout=grid(2,1, heights=[0.9, 0.1]))
     end
     return plt
 end

@@ -3,6 +3,7 @@
   (:objects door1 door2 - door
             key1 key2 - key
             gem1 gem2 gem3 - gem
+            red blue - color
             human robot - agent)
   (:init (= (walls) (new-bit-matrix false 8 8))
          (= (agentcode human) 0)
@@ -15,18 +16,22 @@
          (= (yloc gem2) 1)
          (= (xloc key1) 1)
          (= (yloc key1) 2)
+         (iscolor key1 red)
          (= (xloc key2) 6)
          (= (yloc key2) 2)
+         (iscolor key2 blue)
          (= (walls) (set-index walls true 2 7))
          (= (walls) (set-index walls true 2 8))
          (= (xloc door1) 1)
          (= (yloc door1) 3)
+         (iscolor door1 red)
          (locked door1)
          (= (walls) (set-index walls true 3 2))
          (= (walls) (set-index walls true 3 3))
          (= (walls) (set-index walls true 3 4))
          (= (xloc door2) 5)
          (= (yloc door2) 3)
+         (iscolor door2 blue)
          (locked door2)
          (= (walls) (set-index walls true 3 6))
          (= (walls) (set-index walls true 3 7))
@@ -49,5 +54,5 @@
          (= (yloc human) 8)
          (= (xloc robot) 3)
          (= (yloc robot) 2))
-  (:goal (has gem1))
+  (:goal (has human gem1))
 )

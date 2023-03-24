@@ -1,3 +1,12 @@
+; kk...r.Dg
+; WWWW.WWWW
+; WWWW.WWWW
+; WWWW.WWWW
+; .......D.
+; .WWW.WWW.
+; .WWWhWWWD
+; .WWW.WWW.
+; gWWWgWWWG
 (define (problem doors-keys-gems-problem)
   (:domain doors-keys-gems)
   (:objects door1 door2 door3 - door
