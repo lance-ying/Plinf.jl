@@ -5,10 +5,13 @@ using PDDL
 function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
     rows = split(str, "\n", keepempty=false)
     width, height = maximum(length.(strip.(rows))), length(rows)
-    doors, keys, gems = Const[], Const[], Const[]
+    doors, keys, gems, agents = Const[], Const[], Const[], Const[]
+    push!(agents, Const(Symbol("human")))
+    push!(agents, Const(Symbol("robot")))
     walls = parse_pddl("(= walls (new-bit-matrix false $width $height))")
     init = Term[walls]
-    start, goal = Term[], pddl"(true)"
+    append!(init, parse_pddl("(= (agentcode human) 0)","(= (agentcode robot) 1)","(= turn 0)"))
+    start_human, start_robot, goal = Term[],Term[], pddl"(true)"
     for (y, row) in enumerate(rows)
         for (x, char) in enumerate(strip(row))
             if char == '.' # Unoccupied
@@ -30,17 +33,22 @@ function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
                 push!(gems, g)
                 append!(init, parse_pddl("(= (xloc $g) $x)", "(= (yloc $g) $y)"))
                 if char == 'G' goal = parse_pddl("(has $g)") end
-            elseif char == 's' # Start position
-                start = parse_pddl("(= xpos $x)", "(= ypos $y)")
+            elseif char == 'h' # Start position
+                start_human = parse_pddl("(= (xloc human) $x)", "(= (yloc human) $y)")
+            elseif char == 'r'
+                start_robot = parse_pddl("(= (xloc robot) $x)", "(= (yloc robot) $y)")
             end
         end
     end
-    append!(init, start)
+    append!(init, start_human)
+    append!(init, start_robot)
     objtypes = merge(Dict(d => :door for d in doors),
                      Dict(k => :key for k in keys),
-                     Dict(g => :gem for g in gems))
+                     Dict(g => :gem for g in gems),
+                     Dict(a => :agent for a in agents))
+
     problem = GenericProblem(Symbol(name), Symbol("doors-keys-gems"),
-                             [doors; keys; gems], objtypes, init, goal,
+                             [doors; keys; gems; agents], objtypes, init, goal,
                              nothing, nothing)
     return problem
 end

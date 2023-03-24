@@ -32,7 +32,7 @@ plan, traj = planner(domain, state, spec)
 println("== Plan ==")
 display(plan)
 plt = render(state; start=start_pos, plan=plan, gem_colors=gem_colors)
-anim = anim_traj(traj; gem_colors=gem_colors, plan=plan)
+anim = anim_traj(traj; start_pos=start_pos, gem_colors=gem_colors, plan=plan)
 @assert satisfy(domain, traj[end], goal) == true
 
 # Visualize full horizon probabilistic A* search
