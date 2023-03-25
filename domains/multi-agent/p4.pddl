@@ -1,10 +1,10 @@
-; kk...r.Dg
+; r....m.Rg
+; y.WW.WWWW
 ; WWWW.WWWW
 ; WWWW.WWWW
-; WWWW.WWWW
-; .......D.
+; .......Y.
 ; .WWW.WWW.
-; .WWWhWWWD
+; .WWWhWWWR
 ; .WWW.WWW.
 ; gWWWgWWWG
 (define (problem doors-keys-gems-problem)
@@ -12,6 +12,7 @@
   (:objects door1 door2 door3 - door
             key1 key2 - key
             gem1 gem2 gem3 gem4 - gem
+            red yellow - color
             human robot - agent)
   (:init (= (walls) (new-bit-matrix false 9 9))
          (= (agentcode human) 0)
@@ -19,15 +20,16 @@
          (= (turn) 0)
          (= (xloc key1) 1)
          (= (yloc key1) 1)
-         (= (xloc key2) 2)
-         (= (yloc key2) 1)
+         (iscolor key1 red)
          (= (xloc door1) 8)
          (= (yloc door1) 1)
+         (iscolor door1 red)
          (locked door1)
          (= (xloc gem1) 9)
          (= (yloc gem1) 1)
-         (= (walls) (set-index walls true 2 1))
-         (= (walls) (set-index walls true 2 2))
+         (= (xloc key2) 1)
+         (= (yloc key2) 2)
+         (iscolor key2 yellow)
          (= (walls) (set-index walls true 2 3))
          (= (walls) (set-index walls true 2 4))
          (= (walls) (set-index walls true 2 6))
@@ -52,6 +54,7 @@
          (= (walls) (set-index walls true 4 9))
          (= (xloc door2) 8)
          (= (yloc door2) 5)
+         (iscolor door2 yellow)
          (locked door2)
          (= (walls) (set-index walls true 6 2))
          (= (walls) (set-index walls true 6 3))
@@ -67,6 +70,7 @@
          (= (walls) (set-index walls true 7 8))
          (= (xloc door3) 9)
          (= (yloc door3) 7)
+         (iscolor door3 red)
          (locked door3)
          (= (walls) (set-index walls true 8 2))
          (= (walls) (set-index walls true 8 3))
@@ -90,5 +94,5 @@
          (= (yloc human) 7)
          (= (xloc robot) 6)
          (= (yloc robot) 1))
-  (:goal (has gem4))
+  (:goal (has human gem4))
 )

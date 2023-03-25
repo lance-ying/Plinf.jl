@@ -5,7 +5,7 @@ using PDDL
 function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
     rows = split(str, "\n", keepempty=false)
     width, height = maximum(length.(strip.(rows))), length(rows)
-    doors, keys, gems, agents = Const[], Const[], Const[], Const[]
+    doors, keys, gems, agents, colors = Const[], Const[], Const[], Const[], Const[]
     push!(agents, Const(Symbol("human")))
     push!(agents, Const(Symbol("robot")))
     key_dict=Dict('r' =>  Const(Symbol("red")) , 'b' =>  Const(Symbol("blue")), 'y' =>  Const(Symbol("yellow")) , 'e' =>  Const(Symbol("green")), 'p' => Const(Symbol("pink")))
@@ -25,20 +25,25 @@ function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
                 d = Const(Symbol("door$(length(doors)+1)"))
                 c = door_dict[char]
                 push!(doors, d)
+                if !(c in colors)
+                    push!(colors, c)
+                end
                 append!(init, parse_pddl("(= (xloc $d) $x)", "(= (yloc $d) $y)"))
-                append!(init, parse_pddl("(iscolor $d $c)"))
+                push!(init, parse_pddl("(iscolor $d $c)"))
                 push!(init, parse_pddl("(locked $d)"))
             elseif haskey(key_dict, char)  # Key
                 k = Const(Symbol("key$(length(keys)+1)"))
                 c = key_dict[char]
                 push!(keys, k)
                 append!(init, parse_pddl("(= (xloc $k) $x)", "(= (yloc $k) $y)"))
-                append!(init, parse_pddl("(iscolor $k $c)"))
+                # print(c)
+                # print(typeof(c))
+                push!(init, parse_pddl("(iscolor $k $c)"))
             elseif char == 'g' || char == 'G' # Gem
                 g = Const(Symbol("gem$(length(gems)+1)"))
                 push!(gems, g)
                 append!(init, parse_pddl("(= (xloc $g) $x)", "(= (yloc $g) $y)"))
-                if char == 'G' goal = parse_pddl("(has $g)") end
+                if char == 'G' goal = parse_pddl("(has human $g)") end
             elseif char == 'h' # Start position
                 start_human = parse_pddl("(= (xloc human) $x)", "(= (yloc human) $y)")
             elseif char == 'm'
@@ -51,10 +56,11 @@ function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
     objtypes = merge(Dict(d => :door for d in doors),
                      Dict(k => :key for k in keys),
                      Dict(g => :gem for g in gems),
+                     Dict(c => :color for c in colors),
                      Dict(a => :agent for a in agents))
 
     problem = GenericProblem(Symbol(name), Symbol("doors-keys-gems"),
-                             [doors; keys; gems; agents], objtypes, init, goal,
+                             [doors; keys; gems; colors; agents], objtypes, init, goal,
                              nothing, nothing)
     return problem
 end

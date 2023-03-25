@@ -5,7 +5,7 @@ using PDDL
 function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
     rows = split(str, "\n", keepempty=false)
     width, height = maximum(length.(strip.(rows))), length(rows)
-    doors, keys, gems = Const[], Const[], Const[]
+    doors, keys, gems, colors = Const[], Const[], Const[], Const[]
     walls = parse_pddl("(= walls (new-bit-matrix false $height $width))")
     init = Term[walls]
     start, goal = Term[], pddl"(true)"
