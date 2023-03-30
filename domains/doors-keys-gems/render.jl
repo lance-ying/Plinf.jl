@@ -59,6 +59,7 @@ function render_door!(x::Real, y::Real, scale::Real; color=:gray, alpha=1,
     color = isa(color, Symbol) ? HSV(Colors.parse(Colorant, color)) : HSV(color)
     inner_col = HSV(color.h, 0.8*color.s, min(1.25*color.v, 1))
     door = make_door(x, y, scale)
+    print(inner_col)
     plot!(plt, door, alpha=alpha, linealpha=[0 1 0 0], legend=false,
           color=[color inner_col :black :black])
 end

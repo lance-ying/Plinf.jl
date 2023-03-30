@@ -6,7 +6,7 @@ include("ascii.jl")
 include("render.jl")
 
 #--- Initial Setup ---#
-costs = (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.2)
+costs = (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.8)
 # Register PDDL array theory
 PDDL.Arrays.register!()
 
@@ -27,7 +27,8 @@ gem_colors = Dict(zip(gem_terms, goal_colors))
 #--- Visualize Plans ---#
 
 # Check that A* heuristic search correctly solves the problem
-planner = AStarPlanner(heuristic=GoalCountHeuristic())
+planner
+planner = AStarPlanner(heuristic=GemHeuristic())
 plan, traj = planner(domain, state, spec)
 println("== Plan ==")
 display(plan)
@@ -60,7 +61,7 @@ anim = anim_traj(trajs, plt; alpha=0.1, gem_colors=gem_colors)
 #--- Goal Inference Setup ---#
 
 # Specify possible goals
-goals = @pddl("(has gem1)", "(has gem2)", "(has gem3)")
+goals = @pddl("(has human gem1)", "(has human gem2)", "(has human gem3)")
 goal_idxs = collect(1:length(goals))
 goal_names = [repr(g) for g in goals]
 
@@ -83,7 +84,7 @@ agent_config = AgentConfig(domain, agent_planner, act_noise=act_noise)
 
 # Define observation noise model
 obs_params = observe_params(
-    (pddl"(xpos)", normal, 1.0), (pddl"(ypos)", normal, 1.0),
+    # (pddl"(xloc)", normal, 1.0), (pddl"(yloc)", normal, 1.0),
     (pddl"(forall (?d - door) (locked ?d))", 0.05),
     (pddl"(forall (?i - item) (has ?i))", 0.05),
     (pddl"(forall (?i - item) (offgrid ?i))", 0.05),
@@ -96,12 +97,14 @@ world_init = WorldInit(agent_init, state, state)
 world_config = WorldConfig(domain, agent_config, obs_params)
 
 # Construct a trajectory with backtracking to perform inference on
-plan1, traj = planner(domain, state, pddl"(has key2)")
-plan2, traj = planner(domain, traj[end], pddl"(not (locked door2))")
-plan3, traj = planner(domain, traj[end], pddl"(has key1)")
-plan4, traj = planner(domain, traj[end], pddl"(has gem3)")
-plan = [plan1; plan2; plan3; plan4]
-traj = PDDL.simulate(domain, state, plan)
+# plan1, traj = planner(domain, state, pddl"(has  key2)")
+# plan2, traj = planner(domain, traj[end], pddl"(not (locked door2))")
+# plan3, traj = planner(domain, traj[end], pddl"(has key1)")
+# plan4, traj = planner(domain, traj[end], pddl"(has gem3)")
+# plan = [plan1; plan2; plan3; plan4]
+# traj = PDDL.simulate(domain, state, plan)
+
+plan, traj = planner(domain, state, pddl"(not (locked door2))")
 
 # Visualize trajectory
 frames = []
@@ -152,6 +155,7 @@ plotters = [ # List of subplot callbacks:
     # plan_lengths_cb,
     # particle_weights_cb,
 ]
+# print(plotters)
 canvas = render(state; start=start_pos, show_objs=false)
 callback = (t, s, trs, ws) -> begin
     goal_probs_t = collect(values(sort!(get_goal_probs(trs, ws, goal_idxs))))
@@ -177,7 +181,7 @@ act_proposal = act_noise > 0 ? forward_act_proposal : nothing
 act_proposal_args = (act_noise*5,)
 
 # Run a particle filter to perform online goal inference
-n_samples = 30
+n_samples = 5
 traces, weights =
     world_particle_filter(world_init, world_config, traj, obs_terms, n_samples;
                           resample=true, rejuvenate=nothing,

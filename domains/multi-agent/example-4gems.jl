@@ -4,6 +4,7 @@ using Plinf
 include("utils.jl")
 include("ascii.jl")
 include("render.jl")
+costs = (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.2)
 
 #--- Initial Setup ---#
 
@@ -20,14 +21,14 @@ state = initstate(domain, problem)
 start_pos = Dict("human"=>(state[pddl"(xloc human)"], state[pddl"(yloc human)"]), "robot"=>(state[pddl"(xloc robot)"], state[pddl"(yloc robot)"]))
 goal = [problem.goal]
 spec = MinActionCosts(goal, costs)
-goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF",colorant"#1A85FF",colorant"#356FA0"]
-gem_terms = @pddl("gem1", "gem2", "gem3", "gem4")
+goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF",colorant"#356FA0",colorant"#A56AA0"]
+gem_terms = @pddl("gem1", "gem2", "gem3", "gem4", "gem5")
 gem_colors = Dict(zip(gem_terms, goal_colors))
 
 #--- Visualize Plans ---#
 
 # Check that A* heuristic search correctly solves the problem
-planner = AStarPlanner(heuristic=goalCountHeuristic())
+planner = AStarPlanner(heuristic=GoalCountHeuristic())
 plan, traj = planner(domain, state, spec)
 println("== Plan ==")
 display(plan)
@@ -36,7 +37,7 @@ anim = anim_traj(traj; start_pos=start_pos, gem_colors=gem_colors, plan=plan)
 @assert satisfy(domain, traj[end], goal) == true
 
 # Visualize full horizon probabilistic A* search
-planner = ProbAStarPlanner(heuristic=GemHeuristic(), trace_states=true)
+planner = ProbAStarPlanner(heuristic=GoalCountHeuristic(), trace_states=true)
 plt = render(state; start=start_pos, gem_colors=gem_colors, show_objs=true)
 tr = Gen.simulate(sample_plan, (planner, domain, state, goal))
 anim = anim_plan(tr, plt)

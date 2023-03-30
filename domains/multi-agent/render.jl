@@ -69,15 +69,28 @@ function make_door(x::Real, y::Real, scale::Real)
             for s in [bg, fg, hole1, hole2]]
 end
 
+# "Plot a door with the given position and scale."
+# function render_door!(x::Real, y::Real, scale::Real; color=:gray, alpha=1,
+#                       plt=nothing)
+#     plt = (plt == nothing) ? plot!() : plt
+#     color = isa(color, Symbol) ? HSV(Colors.parse(Colorant, color)) : HSV(color)
+#     inner_col = HSV(color.h, 0.8*color.s, min(1.25*color.v, 1))
+#     door = make_door(x, y, scale)
+#     plot!(plt, door, alpha=alpha, linealpha=[0 1 0 0], legend=false,
+#           color=[color inner_col :black :black])
+# end
+
 "Plot a door with the given position and scale."
 function render_door!(x::Real, y::Real, scale::Real; color=:gray, alpha=1,
                       plt=nothing)
     plt = (plt == nothing) ? plot!() : plt
+    # print(color)
+    # print("break")
     color = isa(color, Const) ? HSV(Colors.parse(Colorant, color.name)) : HSV(color)
     inner_col = HSV(color.h, 0.8*color.s, min(1.25*color.v, 1))
     door = make_door(x, y, scale)
-    plot!(plt, door, alpha=alpha, linealpha=[0 1 0 0], legend=false,
-          color=[color inner_col :black :black])
+    # plot!(plt, door, alpha=alpha, linealpha=[0 1 0 0], legend=false,
+    #       color=[color inner_col :black :black])
 end
 
 "Make a key using Plots.jl shapes."
@@ -132,7 +145,6 @@ function render_pos!(state::State, plt=nothing;
     x_robot, y_robot = get_agent_pos(state, flip_y=true)["robot"]
 
     if dir in [:up, :down, :right, :left]
-        print(t)
         if t%2==1
             marker_human = make_triangle(x_human, y_human, radius*1.5, dir)
             marker_robot = make_circle(x_robot, y_robot, radius)
@@ -305,7 +317,8 @@ function render_plan!(state::State, plan, start::Dict{String, Tuple{Int,Int}}, p
             marker_human = make_circle(x_h, y_h, radius)
             marker_robot = make_circle(x_r, y_r, radius)
         end
-        plot!(plt, [marker_human, marker_robot], color=color, la=0, alpha=i_alpha, legend=false)
+        plot!(plt, marker_human, color=:red, la=0, alpha=i_alpha, legend=false)
+        plot!(plt, marker_robot, color=:blue, la=0, alpha=i_alpha, legend=false)
     end
     return plt
 end
@@ -352,7 +365,7 @@ function render_traces!(traces, weights=nothing, plt=nothing;
             env_traj = env_traj[min(length(env_traj), t_cur+1):end]
         end
         for state in env_traj
-            pt = get_agent_pos(state, flip_y=true)
+            pt = get_agent_pos(state, flip_y=true)["human"]
             goal_pt_weights[pt] = get(goal_pt_weights, pt, 0.0) + exp(w)
         end
     end
@@ -462,9 +475,9 @@ function anim_plan(trace, canvas, animation=nothing; show=true, fps=10,
     for state in values(node_choices)
         x_human, y_human = get_agent_pos(state, flip_y=true)["human"]
         x_robot, y_robot = get_agent_pos(state, flip_y=true)["robot"]
-        dot_human = make_circle(x, y, node_radius)
-        dot_human = make_circle(x, y, node_radius)
-        plt = plot!(plt, dot, color=search_color, alpha=search_alpha,
+        dot_human = make_circle(x_human, y_human, node_radius)
+        dot_robot = make_circle(x_robot, y_robot, node_radius)
+        plt = plot!(plt, dot_human, color=search_color, alpha=search_alpha,
                     linealpha=0, legend=false)
         frame(animation, plt)
     end
@@ -609,7 +622,8 @@ function render_cb(t::Int, state, traces, weights;
         dir = i == nothing ? start_dir : plan[i].name
     end
     render_objects!(state, plt; kwargs...) # Render objects in gridworld
-    render_pos!(state, plt; dir=dir, kwargs...)  # Render agent's position
+    print(t)
+    render_pos!(state, plt; t,dir=dir, kwargs...)  # Render agent's position
     render_traces!(traces, weights, plt; kwargs...) # Render trajectories
     title!(plt, "t = $t")
     if show_inventory
@@ -662,6 +676,8 @@ function multiplot_cb(t::Int, state, traces, weights,
                       plotters=[render_cb]; layout=nothing,
                       keytimes::Vector{Int}=Int[], keyframes=nothing,
                       animation=nothing, show=true, kwargs...)
+    # print(plotters)
+    # print(t)
     subplots = [p(t, state, traces, weights; kwargs...) for p in plotters]
     margin = plotters == [render_cb] ? 2*Plots.mm : 10*Plots.mm
     if layout == nothing

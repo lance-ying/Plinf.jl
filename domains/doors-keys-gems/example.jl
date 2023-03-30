@@ -7,8 +7,6 @@ include("render.jl")
 
 #--- Initial Setup ---#
 
-costs = (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.2)
-
 # Register PDDL array theory
 PDDL.Arrays.register!()
 
@@ -23,12 +21,15 @@ start_pos = (state[pddl"xpos"], state[pddl"ypos"])
 goal = [problem.goal]
 goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF"]
 gem_terms = @pddl("gem1", "gem2", "gem3")
+
+# goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF"]
+# gem_terms = @pddl("gem1", "gem2", "gem3")
 gem_colors = Dict(zip(gem_terms, goal_colors))
 
 #--- Visualize Plans ---#
 
 # Check that A* heuristic search correctly solves the problem
-planner = AStarPlanner(heuristic=GoalCountHeuristic())
+planner = AStarPlanner(heuristic=GemHeuristic())
 plan, traj = planner(domain, state, goal)
 println("== Plan ==")
 display(plan)
@@ -61,7 +62,7 @@ anim = anim_traj(trajs, plt; alpha=0.1, gem_colors=gem_colors)
 #--- Goal Inference Setup ---#
 
 # Specify possible goals
-goals = @pddl("(has gem1)", "(has gem2)", "(has gem3)")
+goals = @pddl("(has gem1)", "(has gem2)", "(has gem3)","(has gem4)","(has gem5)")
 goal_idxs = collect(1:length(goals))
 goal_names = [repr(g) for g in goals]
 
@@ -75,7 +76,7 @@ goal_strata = Dict((:init => :agent => :goal => :goal) => goal_idxs)
 heuristic = GemMazeDist()
 planner = ProbAStarPlanner(heuristic=heuristic, search_noise=0.1)
 replanner = Replanner(planner=planner, persistence=(2, 0.95))
-agent_planner = replanner # planner
+agent_planner = planner # planner
 
 # Configure agent model with goal prior and planner
 act_noise = 0.0
@@ -121,7 +122,7 @@ n_samples = 30
 traces, weights, lml_est =
     world_importance_sampler(world_init, world_config,
                              traj, obs_terms, n_samples;
-                             use_proposal=true, strata=goal_strata);
+                             use_proposal=false, strata=goal_strata);
 
 # Plot sampled trajectory for each trace
 plt = render(state; start=start_pos, gem_colors=gem_colors)
@@ -178,7 +179,7 @@ act_proposal = act_noise > 0 ? forward_act_proposal : nothing
 act_proposal_args = (act_noise*5,)
 
 # Run a particle filter to perform online goal inference
-n_samples = 30
+n_samples = 60
 traces, weights =
     world_particle_filter(world_init, world_config, traj, obs_terms, n_samples;
                           resample=true, rejuvenate=nothing,
