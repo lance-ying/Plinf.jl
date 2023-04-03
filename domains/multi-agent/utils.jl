@@ -22,7 +22,32 @@ function get_color(state::State, obj::Const)
     end
 end
 
+function generate_gems(num_gems:: Integer)
+    if num_gems == 3
+        goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF"]
+        gem_terms = @pddl("gem1", "gem2", "gem3")
+        return goal_colors, gem_terms, Dict(zip(gem_terms, goal_colors))
+    elseif num_gems == 4
+        goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF",colorant"#24D60C"]
+        gem_terms = @pddl("gem1", "gem2", "gem3", "gem4")
+        return goal_colors, gem_terms, Dict(zip(gem_terms, goal_colors))
+    else
+        goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF",colorant"#24D60C",colorant"#A56AA0"]
+        gem_terms = @pddl("gem1", "gem2", "gem3", "gem4", "gem5")
+        return goal_colors, gem_terms, Dict(zip(gem_terms, goal_colors))
+    end
 
+end
+
+function return_goals(num_gems:: Integer)
+    if num_gems == 3
+        return @pddl("(has gem1)", "(has gem2)", "(has gem3)")
+    elseif num_gems == 4
+        return @pddl("(has gem1)", "(has gem2)", "(has gem3)","(has gem4)")
+    else 
+        return @pddl("(has gem1)", "(has gem2)", "(has gem3)","(has gem4)","(has gem5)")
+    end
+end
 
 function get_obj_loc(state::State, obj::Const;
     check_has::Bool=false, flip_y::Bool=false)

@@ -6,7 +6,7 @@ include("ascii.jl")
 include("render.jl")
 
 #--- Initial Setup ---#
-costs = (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.8)
+costs = (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6)
 # Register PDDL array theory
 PDDL.Arrays.register!()
 
@@ -61,7 +61,7 @@ anim = anim_traj(trajs, plt; alpha=0.1, gem_colors=gem_colors)
 #--- Goal Inference Setup ---#
 
 # Specify possible goals
-goals = @pddl("(has human gem1)", "(has human gem2)", "(has human gem3)")
+goals = @pddl("(has human gem1)", "(has human gem2)","(has human gem3)")
 goal_idxs = collect(1:length(goals))
 goal_names = [repr(g) for g in goals]
 
@@ -84,7 +84,8 @@ agent_config = AgentConfig(domain, agent_planner, act_noise=act_noise)
 
 # Define observation noise model
 obs_params = observe_params(
-    # (pddl"(xloc)", normal, 1.0), (pddl"(yloc)", normal, 1.0),
+    (pddl"(xloc human)", normal, 1.0), (pddl"(yloc human)", normal, 1.0),
+    (pddl"(xloc robot)", normal, 1.0), (pddl"(yloc robot)", normal, 1.0),
     (pddl"(forall (?d - door) (locked ?d))", 0.05),
     (pddl"(forall (?i - item) (has ?i))", 0.05),
     (pddl"(forall (?i - item) (offgrid ?i))", 0.05),
@@ -103,7 +104,8 @@ world_config = WorldConfig(domain, agent_config, obs_params)
 # plan4, traj = planner(domain, traj[end], pddl"(has gem3)")
 # plan = [plan1; plan2; plan3; plan4]
 # traj = PDDL.simulate(domain, state, plan)
-
+spec = MinActionCosts([pddl"(not (locked door2))"], costs)
+plan, traj = ProbAStarPlanner(heuristic=GoalCountHeuristic(), search_noise=0.1)(domain, state, spec)
 plan, traj = planner(domain, state, pddl"(not (locked door2))")
 
 # Visualize trajectory
@@ -145,7 +147,7 @@ plot_goal_bars!(goal_probs, goal_names, goal_colors)
 # Set up visualization and logging callbacks for online goal inference
 
 anim = Animation() # Animation to store each plotted frame
-keytimes = [4, 9, 17, 21] # Timesteps to save keyframes
+keytimes = [2, 4, 8, 12] # Timesteps to save keyframes
 keyframes = [] # Buffer of keyframes to plot as a storyboard
 goal_probs = [] # Buffer of goal probabilities over time
 plotters = [ # List of subplot callbacks:
@@ -181,7 +183,7 @@ act_proposal = act_noise > 0 ? forward_act_proposal : nothing
 act_proposal_args = (act_noise*5,)
 
 # Run a particle filter to perform online goal inference
-n_samples = 5
+n_samples = 20
 traces, weights =
     world_particle_filter(world_init, world_config, traj, obs_terms, n_samples;
                           resample=true, rejuvenate=nothing,
@@ -195,10 +197,10 @@ gif(anim; fps=2)
 
 storyboard = plot_storyboard(
     keyframes, goal_probs, keytimes;
-    time_lims=(1, 27), legend=false,
-    titles=["Initially ambiguous goal",
-            "Red eliminated upon key pickup",
-            "Yellow most likely upon unlock",
-            "Switch to blue upon backtracking"],
+    time_lims=(1, 12), legend=false,
+    # titles=["Initially ambiguous goal",
+            # "Red eliminated upon key pickup",
+            # "Yellow most likely upon unlock",
+            # "Switch to blue upon backtracking"],
     goal_names=["Red Gem", "Yellow Gem", "Blue Gem"],
     goal_colors=goal_colors)

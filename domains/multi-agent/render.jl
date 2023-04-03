@@ -84,13 +84,11 @@ end
 function render_door!(x::Real, y::Real, scale::Real; color=:gray, alpha=1,
                       plt=nothing)
     plt = (plt == nothing) ? plot!() : plt
-    # print(color)
-    # print("break")
     color = isa(color, Const) ? HSV(Colors.parse(Colorant, color.name)) : HSV(color)
     inner_col = HSV(color.h, 0.8*color.s, min(1.25*color.v, 1))
     door = make_door(x, y, scale)
-    # plot!(plt, door, alpha=alpha, linealpha=[0 1 0 0], legend=false,
-    #       color=[color inner_col :black :black])
+    plot!(plt, door, alpha=alpha, linealpha=[0 1 0 0], legend=false,
+          color=[color inner_col :black :black])
 end
 
 "Make a key using Plots.jl shapes."
@@ -145,12 +143,15 @@ function render_pos!(state::State, plt=nothing;
     x_robot, y_robot = get_agent_pos(state, flip_y=true)["robot"]
 
     if dir in [:up, :down, :right, :left]
-        if t%2==1
-            marker_human = make_triangle(x_human, y_human, radius*1.5, dir)
-            marker_robot = make_circle(x_robot, y_robot, radius)
-        else
-            marker_robot = make_triangle(x_robot, y_robot, radius*1.5, dir)
-            marker_human = make_circle(x_human, y_human, radius)
+        marker_human = make_circle(x_human, y_human, radius)
+        marker_robot = make_circle(x_robot, y_robot, radius)
+
+        # if t%2==1
+        #     marker_human = make_triangle(x_human, y_human, radius*1.5, :up)
+        #     marker_robot = make_circle(x_robot, y_robot, radius)
+        # else
+        #     marker_robot = make_triangle(x_robot, y_robot, radius*1.5, :up)
+        #     marker_human = make_circle(x_human, y_human, radius)
         end
         # xscale, yscale = (dir in [:up, :down]) ? (0.8, 1.0) : (1.0, 0.8)
         # Plots.scale!(marker, xscale, yscale)
@@ -158,7 +159,8 @@ function render_pos!(state::State, plt=nothing;
         marker_human = make_circle(x_human, y_human, radius)
         marker_robot = make_circle(x_robot, y_robot, radius)
     end
-    plot!(plt, [marker_human,  marker_robot], color=[color["human"], color["robot"]], alpha=alpha, linealpha=0, legend=false)
+    plot!(plt, marker_human, color=color["human"], alpha=alpha, linealpha=0, legend=false)
+    plot!(plt, marker_robot, color=color["robot"], alpha=alpha, linealpha=0, legend=false)
 end
 
 "Render doors, keys and gems present in the given state."
@@ -298,7 +300,6 @@ function render_plan!(state::State, plan, start::Dict{String, Tuple{Int,Int}}, p
     start_human = (start["human"][1], height-start["human"][2]+1)
     start_robot = (start["robot"][1], height-start["robot"][2]+1)
     traj_human,traj_robot = plan_to_traj(plan, start_human, start_robot)
-    # print(traj_human,traj_robot)
     if trunc != nothing && length(plan) >= trunc
         plan, traj_human, traj_robot = plan[end-trunc+1:end], traj_human[end-trunc:end-1],traj_robot[end-trunc:end-1] end
     i_alpha = fade ? 0.0 : alpha
@@ -622,7 +623,6 @@ function render_cb(t::Int, state, traces, weights;
         dir = i == nothing ? start_dir : plan[i].name
     end
     render_objects!(state, plt; kwargs...) # Render objects in gridworld
-    print(t)
     render_pos!(state, plt; t,dir=dir, kwargs...)  # Render agent's position
     render_traces!(traces, weights, plt; kwargs...) # Render trajectories
     title!(plt, "t = $t")
