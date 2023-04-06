@@ -70,6 +70,16 @@
                 (and (= (+ (xloc ?a) 1) (xloc ?b)) (= (yloc ?a) (yloc ?b)))))
      :effect (and (not (has ?a ?o)) (has ?b ?o) (assign turn (- 1  turn)))
     )
+    ; (:action handover2
+    ;  :parameters (?a - agent ?b - agent ?o - object ?i)
+    ;  :precondition
+    ;  (and   (has ?a ?o) (has ?a ?i) (= turn (agentcode ?a))
+    ;         (or (and (= (xloc ?a) (xloc ?b)) (= (- (yloc ?a) 1) (yloc ?b)))
+    ;             (and (= (xloc ?a) (xloc ?b)) (= (+ (yloc ?a) 1) (yloc ?b)))
+    ;             (and (= (- (xloc ?a) 1) (xloc ?b)) (= (yloc ?a) (yloc ?b)))
+    ;             (and (= (+ (xloc ?a) 1) (xloc ?b)) (= (yloc ?a) (yloc ?b)))))
+    ;  :effect (and (not (has ?a ?o)) (not (has ?a ?i)) (has ?b ?o) (has ?b ?i) (assign turn (- 1  turn)))
+    ; )
     (:action noop
      :parameters (?a - agent)
      :precondition

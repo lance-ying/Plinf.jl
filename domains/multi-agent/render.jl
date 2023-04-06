@@ -142,9 +142,9 @@ function render_pos!(state::State, plt=nothing;
     x_human, y_human = get_agent_pos(state, flip_y=true)["human"]
     x_robot, y_robot = get_agent_pos(state, flip_y=true)["robot"]
 
-    if dir in [:up, :down, :right, :left]
-        marker_human = make_circle(x_human, y_human, radius)
-        marker_robot = make_circle(x_robot, y_robot, radius)
+    # if dir in [:up, :down, :right, :left]
+        # marker_human = make_circle(x_human, y_human, radius)
+        # marker_robot = make_circle(x_robot, y_robot, radius)
 
         # if t%2==1
         #     marker_human = make_triangle(x_human, y_human, radius*1.5, :up)
@@ -152,13 +152,13 @@ function render_pos!(state::State, plt=nothing;
         # else
         #     marker_robot = make_triangle(x_robot, y_robot, radius*1.5, :up)
         #     marker_human = make_circle(x_human, y_human, radius)
-        end
+        # end
         # xscale, yscale = (dir in [:up, :down]) ? (0.8, 1.0) : (1.0, 0.8)
         # Plots.scale!(marker, xscale, yscale)
-    else
-        marker_human = make_circle(x_human, y_human, radius)
-        marker_robot = make_circle(x_robot, y_robot, radius)
-    end
+    # else
+    marker_human = make_circle(x_human, y_human, radius)
+    marker_robot = make_circle(x_robot, y_robot, radius)
+    # end
     plot!(plt, marker_human, color=color["human"], alpha=alpha, linealpha=0, legend=false)
     plot!(plt, marker_robot, color=color["robot"], alpha=alpha, linealpha=0, legend=false)
 end

@@ -15,7 +15,7 @@ PDDL.Arrays.register!()
 # Load domain and problem
 path = joinpath(dirname(pathof(Plinf)), "..", "domains", "multi-agent")
 domain = load_domain(joinpath(path, "domain.pddl"))
-problem = load_problem(joinpath(path, "p1.pddl"))
+problem = load_problem(joinpath(path, "p2.pddl"))
 
 # Initialize state, set goal and goal colors
 state = initstate(domain, problem)
@@ -24,7 +24,7 @@ goal = [problem.goal]
 goal=[pddl"(not (locked door2))"]
 spec = MinActionCosts(goal, costs)
 
-num_gems=3
+num_gems=5
 goal_colors, gem_terms, gem_colors = generate_gems(num_gems)
 
 plt = render(state; start=start_pos, gem_colors=gem_colors)
@@ -36,11 +36,12 @@ plt = render(state; start=start_pos, gem_colors=gem_colors)
 # Check that A* heuristic search correctly solves the problem
 planner = AStarPlanner(heuristic=GemHeuristic())
 plan, traj = planner(domain, state, spec)
+spec = MinActionCosts([pddl"(has human gem3)"], costs)
+plan, traj = planner(domain, state, spec)
+
 println("== Plan ==")
 display(plan)
-plan = Term[pddl"right(human)"]
-plan = Term[pddl"(noop human)", pddl"(noop robot)",pddl"(right human)", pddl"(right robot)", pddl"(right human)", pddl"(right robot)", pddl"(right human)", pddl"(right robot)", pddl"(up human)", pddl"(pickup robot key2)", pddl"(up human)", pddl"(left robot)", pddl"(up human)", pddl"(unlock robot key2 door2)"]
-traj = PDDL.simulate(domain, state, plan)
+
 plt = render(state; start=start_pos, plan=plan, gem_colors=gem_colors)
 anim = anim_traj(traj; start_pos=start_pos, gem_colors=gem_colors, plan=plan)
 @assert satisfy(domain, traj[end], goal) == true
