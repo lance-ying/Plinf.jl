@@ -5,7 +5,7 @@ include("render.jl")
 include("utils.jl")
 include("ascii.jl")
 
-costs = (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.8)
+costs = (pickup=1.0,handover=0.9, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.8)
 
 #--- Initial Setup ---#
 
@@ -21,10 +21,10 @@ problem = load_problem(joinpath(path, "p2.pddl"))
 state = initstate(domain, problem)
 start_pos = Dict("human"=>(state[pddl"(xloc human)"], state[pddl"(yloc human)"]), "robot"=>(state[pddl"(xloc robot)"], state[pddl"(yloc robot)"]))
 goal = [problem.goal]
-goal=[pddl"(not (locked door2))"]
+# goal=[pddl"(not (locked door2))"]
 spec = MinActionCosts(goal, costs)
 
-num_gems=5
+num_gems=4
 goal_colors, gem_terms, gem_colors = generate_gems(num_gems)
 
 plt = render(state; start=start_pos, gem_colors=gem_colors)
@@ -36,8 +36,13 @@ plt = render(state; start=start_pos, gem_colors=gem_colors)
 # Check that A* heuristic search correctly solves the problem
 planner = AStarPlanner(heuristic=GemHeuristic())
 plan, traj = planner(domain, state, spec)
-spec = MinActionCosts([pddl"(has human gem3)"], costs)
+
+
+spec = MinActionCosts([pddl"(has human gem1)"], costs)
 plan, traj = planner(domain, state, spec)
+# plan = Term[pddl"(right human)", pddl"(left robot)", pddl"(right human)", pddl"(up robot)", pddl"(right human)", pddl"(noop robot)", pddl"(down human)", pddl"(noop robot)", pddl"(down human)", pddl"(pickup robot key2)", pddl"(down human)", pddl"(down robot)", pddl"(left human)", pddl"(left robot)", pddl"(left human)", pddl"(left robot)", pddl"(pickup human key4)", pddl"(left robot)", pddl"(right human)", pddl"(left robot)", pddl"(right human)", pddl"(left robot)", pddl"(up human)", pddl"(left robot)", pddl"(up human)", pddl"(left robot)", pddl"(up human)", pddl"(up robot)", pddl"(up human)", pddl"(unlock robot key2 door4)", pddl"(up human)", pddl"(noop robot)", pddl"(up human)", pddl"(noop robot)", pddl"(right human)", pddl"(noop robot)", pddl"(right human)", pddl"(noop robot)", pddl"(right human)"]
+traj = PDDL.simulate(domain, state, plan)
+
 
 println("== Plan ==")
 display(plan)
@@ -94,7 +99,7 @@ agent_config = AgentConfig(domain, agent_planner, act_noise=act_noise)
 
 # Define observation noise model
 obs_params = observe_params(
-    (pddl"(xpos)", normal, 1.0), (pddl"(ypos)", normal, 1.0),
+    # (pddl"(xpos)", normal, 1.0), (pddl"(ypos)", normal, 1.0),
     (pddl"(forall (?d - door) (locked ?d))", 0.05),
     (pddl"(forall (?i - item) (has ?i))", 0.05),
     (pddl"(forall (?i - item) (offgrid ?i))", 0.05),
@@ -112,7 +117,8 @@ plan2, traj = planner(domain, traj[end], pddl"(not (locked door2))")
 plan3, traj = planner(domain, traj[end], pddl"(has key1)")
 plan4, traj = planner(domain, traj[end], pddl"(has gem3)")
 plan = [plan1; plan2; plan3; plan4]
-traj = PDDL.simulate(domain, state, plan)
+plan, traj = planner(domain, state, pddl"(not(locked door1))")
+# traj = PDDL.simulate(domain, state, plan)
 
 # Visualize trajectory
 frames = []
@@ -188,7 +194,7 @@ act_proposal = act_noise > 0 ? forward_act_proposal : nothing
 act_proposal_args = (act_noise*5,)
 
 # Run a particle filter to perform online goal inference
-n_samples = 30
+n_samples = 10
 traces, weights =
     world_particle_filter(world_init, world_config, traj, obs_terms, n_samples;
                           resample=true, rejuvenate=nothing,

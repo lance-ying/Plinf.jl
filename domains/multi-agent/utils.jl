@@ -41,11 +41,11 @@ end
 
 function return_goals(num_gems:: Integer)
     if num_gems == 3
-        return @pddl("(has gem1)", "(has gem2)", "(has gem3)")
+        return @pddl("(has human gem1)", "(has human gem2)", "(has human gem3)")
     elseif num_gems == 4
-        return @pddl("(has gem1)", "(has gem2)", "(has gem3)","(has gem4)")
+        return @pddl("(has human gem1)", "(has human gem2)", "(has human gem3)","(has human gem4)")
     else 
-        return @pddl("(has gem1)", "(has gem2)", "(has gem3)","(has gem4)","(has gem5)")
+        return @pddl("(has human gem1)", "(has human gem2)", "(has human gem3)","(has human gem4)","(has human gem5)")
     end
 end
 

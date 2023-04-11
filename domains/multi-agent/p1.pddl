@@ -2,7 +2,7 @@
   (:domain doors-keys-gems)
   (:objects door1 door2 - door
             key1 key2 - key
-            gem1 gem2 gem3 - gem
+            gem1 gem2 gem3 gem4 - gem
             red blue - color
             human robot - agent)
   (:init (= (walls) (new-bit-matrix false 8 8))
@@ -35,11 +35,13 @@
          (locked door2)
          (= (walls) (set-index walls true 3 6))
          (= (walls) (set-index walls true 3 7))
+         (= (xloc gem3) 8)
+         (= (yloc gem3) 3)
          (= (walls) (set-index walls true 4 2))
          (= (walls) (set-index walls true 4 7))
          (= (walls) (set-index walls true 5 2))
-         (= (xloc gem3) 3)
-         (= (yloc gem3) 5)
+         (= (xloc gem4) 3)
+         (= (yloc gem4) 5)
          (= (walls) (set-index walls true 5 5))
          (= (walls) (set-index walls true 5 7))
          (= (walls) (set-index walls true 6 5))
