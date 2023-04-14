@@ -384,7 +384,7 @@ end
 function anim_traj(traj::AbstractVector{<:State}, canvas=nothing, animation=nothing;
                    show=true, fps=3, show_objs=true, show_inventory=true,
                    plan=nothing, start_pos=nothing, start_dir=nothing,
-                   splitpoints=Int[], frames=[], kwargs...)
+                   splitpoints=Int[], frames=[], problem=nothing, kwargs...)
     canvas = canvas == nothing ?
         render(traj[1]; show_objs=false, kwargs...) : canvas
     animation = animation == nothing ? Animation() : animation
@@ -419,7 +419,9 @@ function anim_traj(traj::AbstractVector{<:State}, canvas=nothing, animation=noth
         if length(splitpoints) > 0 && t >= splitpoints[1]
             # Split animation if split points are given
             push!(splitanims, animation)
-            if t < length(traj) animation = Animation() end
+            if t < length(traj) 
+                animation = Animation() 
+            end
             popfirst!(splitpoints)
         end
     end
@@ -427,6 +429,10 @@ function anim_traj(traj::AbstractVector{<:State}, canvas=nothing, animation=noth
         push!(splitanims, animation) end
     if show
         display(gif(animation; fps=fps)) end
+
+    for (x, ani) in enumerate(splitanims)
+        gif(ani,"/Users/lance/Documents/GitHub/HRI/public/stimuli/$(problem)_$x.gif"; fps=fps)
+    end
     return length(splitanims) > 0 ? splitanims : animation
 end
 

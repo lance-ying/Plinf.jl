@@ -15,7 +15,7 @@ PDDL.Arrays.register!()
 # Load domain and problem
 path = joinpath(dirname(pathof(Plinf)), "..", "domains", "multi-agent")
 domain = load_domain(joinpath(path, "domain.pddl"))
-problem = load_problem(joinpath(path, "p2.pddl"))
+problem = load_problem(joinpath(path, "demo2.pddl"))
 
 # Initialize state, set goal and goal colors
 state = initstate(domain, problem)
@@ -38,7 +38,7 @@ planner = AStarPlanner(heuristic=GemHeuristic())
 plan, traj = planner(domain, state, spec)
 
 
-spec = MinActionCosts([pddl"(has human gem1)"], costs)
+spec = MinActionCosts([pddl"(has human gem3)"], costs)
 plan, traj = planner(domain, state, spec)
 # plan = Term[pddl"(right human)", pddl"(left robot)", pddl"(right human)", pddl"(up robot)", pddl"(right human)", pddl"(noop robot)", pddl"(down human)", pddl"(noop robot)", pddl"(down human)", pddl"(pickup robot key2)", pddl"(down human)", pddl"(down robot)", pddl"(left human)", pddl"(left robot)", pddl"(left human)", pddl"(left robot)", pddl"(pickup human key4)", pddl"(left robot)", pddl"(right human)", pddl"(left robot)", pddl"(right human)", pddl"(left robot)", pddl"(up human)", pddl"(left robot)", pddl"(up human)", pddl"(left robot)", pddl"(up human)", pddl"(up robot)", pddl"(up human)", pddl"(unlock robot key2 door4)", pddl"(up human)", pddl"(noop robot)", pddl"(up human)", pddl"(noop robot)", pddl"(right human)", pddl"(noop robot)", pddl"(right human)", pddl"(noop robot)", pddl"(right human)"]
 traj = PDDL.simulate(domain, state, plan)

@@ -1,15 +1,6 @@
-; r....m.Rg
-; y.WW.WWWW
-; WWWW.WWWW
-; WWWW.WWWW
-; .......Y.
-; .WWW.WWW.
-; .WWWhWWWR
-; .WWW.WWW.
-; gWWWgWWWG
 (define (problem doors-keys-gems-problem)
   (:domain doors-keys-gems)
-  (:objects door1 door2 door3 - door
+  (:objects door1 door2 door3 door4 door5 - door
             key1 key2 - key
             gem1 gem2 gem3 gem4 - gem
             red yellow - color
@@ -72,9 +63,17 @@
          (= (yloc door3) 7)
          (iscolor door3 red)
          (locked door3)
+         (= (xloc door4) 1)
+         (= (yloc door4) 8)
+         (iscolor door4 yellow)
+         (locked door4)
          (= (walls) (set-index walls true 8 2))
          (= (walls) (set-index walls true 8 3))
          (= (walls) (set-index walls true 8 4))
+         (= (xloc door5) 5)
+         (= (yloc door5) 8)
+         (iscolor door5 red)
+         (locked door5)
          (= (walls) (set-index walls true 8 6))
          (= (walls) (set-index walls true 8 7))
          (= (walls) (set-index walls true 8 8))
