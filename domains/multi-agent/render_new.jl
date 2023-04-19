@@ -23,13 +23,16 @@ function get_obj_color(state::State, obj::Const)
     return Const(:none)
 end
 
+
+
 # Construct gridworld renderer
 colorscheme = PDDLViz.colorschemes[:vibrant]
+colors=[:red, colorscheme[2], colorant"#56b4e9", colorant"#009e73"]
 colordict = Dict(
     :red => colorscheme[1],
     :yellow => colorscheme[2],
-    :blue => colorscheme[3],
-    :green => colorscheme[4],
+    :blue => colorant"#0072b2",
+    :green => :springgreen,
     :purple => colorscheme[5],
     :orange => colorscheme[6],
     :none => :gray
@@ -41,21 +44,25 @@ renderer = PDDLViz.GridworldRenderer(
             HumanGraphic() : RobotGraphic(),
         :key => (d, s, o) -> KeyGraphic(
             visible=!s[Compound(:has, [o])],
+            # color=get_obj_color(s, o).name
             color=colordict[get_obj_color(s, o).name]
         ),
         :door => (d, s, o) -> LockedDoorGraphic(
             visible=s[Compound(:locked, [o])],
+            # color=get_obj_color(s, o).name
             color=colordict[get_obj_color(s, o).name]
         ),
         :gem => (d, s, o) -> MultiGraphic(
             GemGraphic(
                 visible=!s[Compound(:has, [o])],
-                color=colorscheme[parse(Int, string(o.name)[end])]
+                # color=colorscheme[parse(Int, string(o.name)[end])]
+                color=colors[parse(Int, string(o.name)[end])]
+                # color=:orange
             ),
-            TextGraphic(
-                string(o.name)[end:end], 0, 0, 0.3,
-                color=:black, font=:bold
-            )
+            # TextGraphic(
+            #     string(o.name)[end:end], 0, 0, 0.3,
+            #     color=:black, font=:bold
+            # )
         )
     ),
     obj_type_z_order = [:door, :key, :gem, :agent],
@@ -119,7 +126,7 @@ function PDDLViz.anim_trajectory!(
             end
         end
     end
-    return Animation(vs)
+    return PDDLViz.Animation(vs)
 end
 
 # Override Makie.convert_video to support GIF loop control

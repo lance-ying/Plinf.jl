@@ -1,6 +1,6 @@
 (define (problem doors-keys-gems-problem)
   (:domain doors-keys-gems)
-  (:objects door1 door2 door3 - door
+  (:objects door1 door2 - door
             key1 key2 - key
             gem1 gem2 gem3 gem4 - gem
             red blue - color
@@ -46,10 +46,6 @@
          (= (walls) (set-index walls true 5 7))
          (= (walls) (set-index walls true 6 5))
          (= (walls) (set-index walls true 6 7))
-         (= (xloc door3) 8)
-         (= (yloc door3) 6)
-         (iscolor door3 red)
-         (locked door3)
          (= (walls) (set-index walls true 7 1))
          (= (walls) (set-index walls true 7 2))
          (= (walls) (set-index walls true 7 3))

@@ -5,7 +5,7 @@ include("render.jl")
 include("utils.jl")
 include("ascii.jl")
 
-costs = (pickup=1.0,handover=0.9, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.8)
+costs = (pickup=1.0,handover=0.9, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.5)
 
 #--- Initial Setup ---#
 
@@ -15,7 +15,7 @@ PDDL.Arrays.register!()
 # Load domain and problem
 path = joinpath(dirname(pathof(Plinf)), "..", "domains", "multi-agent")
 domain = load_domain(joinpath(path, "domain.pddl"))
-problem = load_problem(joinpath(path, "demo2.pddl"))
+problem = load_problem(joinpath(path, "p4.pddl"))
 
 # Initialize state, set goal and goal colors
 state = initstate(domain, problem)
@@ -38,10 +38,10 @@ planner = AStarPlanner(heuristic=GemHeuristic())
 plan, traj = planner(domain, state, spec)
 
 
-spec = MinActionCosts([pddl"(has human gem3)"], costs)
+spec = MinActionCosts([pddl"(has human gem1)"], costs)
 plan, traj = planner(domain, state, spec)
 # plan = Term[pddl"(right human)", pddl"(left robot)", pddl"(right human)", pddl"(up robot)", pddl"(right human)", pddl"(noop robot)", pddl"(down human)", pddl"(noop robot)", pddl"(down human)", pddl"(pickup robot key2)", pddl"(down human)", pddl"(down robot)", pddl"(left human)", pddl"(left robot)", pddl"(left human)", pddl"(left robot)", pddl"(pickup human key4)", pddl"(left robot)", pddl"(right human)", pddl"(left robot)", pddl"(right human)", pddl"(left robot)", pddl"(up human)", pddl"(left robot)", pddl"(up human)", pddl"(left robot)", pddl"(up human)", pddl"(up robot)", pddl"(up human)", pddl"(unlock robot key2 door4)", pddl"(up human)", pddl"(noop robot)", pddl"(up human)", pddl"(noop robot)", pddl"(right human)", pddl"(noop robot)", pddl"(right human)", pddl"(noop robot)", pddl"(right human)"]
-traj = PDDL.simulate(domain, state, plan)
+# traj = PDDL.simulate(domain, state, plan)
 
 
 println("== Plan ==")
@@ -112,11 +112,21 @@ world_init = WorldInit(agent_init, state, state)
 world_config = WorldConfig(domain, agent_config, obs_params)
 
 # Construct a trajectory with backtracking to perform inference on
-plan1, traj = planner(domain, state, pddl"(has key2)")
-plan2, traj = planner(domain, traj[end], pddl"(not (locked door2))")
-plan3, traj = planner(domain, traj[end], pddl"(has key1)")
-plan4, traj = planner(domain, traj[end], pddl"(has gem3)")
-plan = [plan1; plan2; plan3; plan4]
+plan1, traj = planner(domain, state, pddl"(has robot key1)")
+plan2, traj = planner(domain, traj[end], MinActionCosts([pddl"(has human gem2)"], costs))
+plan3, traj = planner(domain, traj[end], MinActionCosts([pddl"(has human gem3)"], costs))
+# plan4, traj = planner(domain, traj[end], pddl"(has gem3)")
+
+plan1 = @pddl("(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)")
+# plan1 = @pddl("(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(pickup robot key1)", "(noop human)", "(left robot)", "(noop human)", "(down robot)", "(noop human)", "(pickup robot key2)", "(noop human)", "(right robot)", "(noop human)", "(down robot)", "(noop human)", "(unlock robot key1 door3)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)",  "(left robot)", "(noop human)", "(left robot)",  "(noop human)", "(handover robot human key2)")
+# plan1 = @pddl("(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(pickup robot key1)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)",  "(down robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)","(left robot)", "(noop human)","(left robot)", "(noop human)")
+plan1 = collect(Term, plan1)
+
+traj = PDDL.simulate(domain, state, plan1) 
+# plan2, traj = planner(domain, traj[end], spec)
+
+plan = [plan1; plan2]
+plan = [plan1; plan2; plan3]
 plan, traj = planner(domain, state, pddl"(not(locked door1))")
 # traj = PDDL.simulate(domain, state, plan)
 
