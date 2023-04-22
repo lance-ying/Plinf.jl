@@ -46,7 +46,7 @@ function run_demo()
  
     traj = PDDL.simulate(domain, state, plan)
 
-    plan = collect(Term, plan)
+    # plan = collect(Term, plan)
 
     # captions = Dict(
     # 1 => "Human: \"Pick up the red key and unlock the red door for me.\""
@@ -54,8 +54,8 @@ function run_demo()
 
     # anim = anim_trajectory(renderer, domain, traj, captions= captions, format="gif", framerate=3)
     # save("/Users/lance/Documents/GitHub/HRI/public/stimuli/demo-language.gif", anim)
-    anim = anim_trajectory(renderer, domain, traj, format="gif", framerate=3)
-    save("/Users/lance/Documents/GitHub/HRI/public/stimuli/demo.gif", anim, framerate=3, loop=-1)
+    anim = anim_trajectory(renderer, domain, traj[1:1], format="gif", framerate=3)
+    save("/Users/lance/Documents/GitHub/HRI/public/stimuli/demo_1.gif", anim, framerate=3, loop=-1)
 
     # anim = anim_traj(traj; start_pos=start_pos, gem_colors=gem_colors, plan=plan, problem="demo")
 
@@ -122,7 +122,7 @@ function run_problem_1(option::Integer)
 
 
     if option == 3
-        plan = @pddl("(right human)", "(right robot)", "(right human)", "(right robot)", "(right human)", "(right robot)", "(up human)", "(pickup robot key2)", "(up human)", "(left robot)", "(up human)", "(unlock robot key2 door2)", "(up human)", "(noop robot)", "(right human)", "(noop robot)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(up human)","(noop robot)", "(right human)","(noop robot)", "(right human)","(noop robot)", "(right human)","(noop robot)")
+        plan = @pddl("(right human)", "(right robot)", "(right human)", "(right robot)", "(right human)", "(right robot)", "(up human)", "(pickup robot key2)", "(up human)", "(left robot)", "(up human)", "(unlock robot key2 door2)", "(up human)", "(noop robot)", "(right human)", "(noop robot)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(up human)","(noop robot)", "(right human)","(noop robot)", "(right human)","(noop robot)", "(right human)","(noop robot)","(pickup human gem3)")
         traj = PDDL.simulate(domain, state, plan)
 
         plan = collect(Term, plan)
@@ -228,7 +228,7 @@ function run_problem_3(option::Integer)
         plan = collect(Term, plan)
 
         traj = PDDL.simulate(domain, state, plan)   
-        viz(traj, domain; splitpoints=[1,18, 28, 32],problem="p3_g2")
+        viz(traj, domain; splitpoints=[1,18, 28, 34],problem="p3_g2")
     end
 
     if option == 3
@@ -236,7 +236,7 @@ function run_problem_3(option::Integer)
         plan =  collect(Term, plan)
 
         traj = PDDL.simulate(domain, state, plan)   
-        viz(traj, domain;splitpoints=[1,19, 28, 32],problem="p3_g3")
+        viz(traj, domain;splitpoints=[1,19, 28, 34],problem="p3_g3")
     end
 
 
@@ -268,11 +268,11 @@ function run_problem_4(option::Integer)
     goal_colors, gem_terms, gem_colors = generate_gems(num_gems)
 
     if option ==1
-        plan = @pddl("(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(pickup robot key1)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(handover robot human key1)", "(right human)","(noop robot)","(right human)","(noop robot)","(unlock human key1 door1)","(noop robot)")
+        plan = @pddl("(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(pickup robot key1)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(handover robot human key1)", "(right human)","(noop robot)","(right human)","(noop robot)","(unlock human key1 door1)","(noop robot)","(right human)", "(noop robot)","(right human)", "(noop robot)","(pickup human gem1)")
         plan =  collect(Term, plan)
 
         traj = PDDL.simulate(domain, state, plan)   
-        viz(traj, domain;splitpoints=[1,10, 18], problem="p4_g1")
+        viz(traj, domain;splitpoints=[1,10, 18, 25], problem="p4_g1")
     end
 
     if option ==2

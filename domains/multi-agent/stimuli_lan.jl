@@ -55,8 +55,8 @@ function run_demo_lan()
     15 => "..."
     )
 
-    anim = anim_trajectory(renderer, domain, traj, captions= captions, format="gif", framerate=3)
-    save("/Users/lance/Documents/GitHub/HRI_l/public/stimuli/demo-language.gif", anim)
+    anim = anim_trajectory(renderer, domain, traj[1:1], captions= captions, format="gif", framerate=3)
+    save("/Users/lance/Documents/GitHub/HRI_l/public/stimuli/demo_1.gif", anim)
     # anim = anim_traj(traj; start_pos=start_pos, gem_colors=gem_colors, plan=plan, splitpoints=[1], problem="demo")
 
 end
@@ -158,7 +158,7 @@ function run_problem_2(option::Integer)
 
         captions = ["Human: \"Can you pass me the red key?\"","Human: \"Can you pass me the red key?\"","...","...", "..."]
 
-        viz(splitpoints=[1,10, 20, 34], traj, domain,captions=captions, problem="p2_g1")
+        viz_l(splitpoints=[1,10, 20, 34], traj, domain,captions=captions, problem="p2_g1")
         # anim = anim_traj(traj; start_pos=start_pos, gem_colors=gem_colors, plan=plan, splitpoints=[1,10, 24, 36],problem="p2_g1")
     end
 
@@ -237,7 +237,7 @@ function run_problem_3(option::Integer)
 
         traj = PDDL.simulate(domain, state, plan)   
         captions = ["Human: \"Can you pass me the red key?\"","...","...","...", "..."]
-        viz_l(traj, domain; splitpoints=[1,18, 28, 32],captions=captions,problem="p3_g2")
+        viz_l(traj, domain; splitpoints=[1,18, 28, 34],captions=captions,problem="p3_g2")
     end
 
     if option == 3
@@ -246,7 +246,7 @@ function run_problem_3(option::Integer)
 
         traj = PDDL.simulate(domain, state, plan)   
         captions = ["Human: \"Can you pass me the red key?\"","...","...","...", "..."]
-        viz_l(traj, domain;splitpoints=[1,19, 28, 32],captions=captions,problem="p3_g3")
+        viz_l(traj, domain;splitpoints=[1,19, 28, 34],captions=captions,problem="p3_g3")
     end
 
 
@@ -278,12 +278,12 @@ function run_problem_4(option::Integer)
     goal_colors, gem_terms, gem_colors = generate_gems(num_gems)
 
     if option ==1
-        plan = @pddl("(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(pickup robot key1)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(handover robot human key1)", "(right human)","(noop robot)","(right human)","(noop robot)","(unlock human key1 door1)","(noop robot)")
+        plan = @pddl("(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(pickup robot key1)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(handover robot human key1)", "(right human)","(noop robot)","(right human)","(noop robot)","(unlock human key1 door1)","(noop robot)","(right human)", "(noop robot)","(right human)", "(noop robot)","(pickup human gem1)")
         plan =  collect(Term, plan)
 
         traj = PDDL.simulate(domain, state, plan)   
-        captions = ["Human: \"Can you pass me the red key?\"","...","...","..." ]
-        viz_l(traj, domain;splitpoints=[1,10, 18],captions=captions, problem="p4_g1")
+        captions = ["Human: \"Can you pass me the red key?\"","...","...","...","..." ]
+        viz_l(traj, domain;splitpoints=[1,10, 18, 25],captions=captions, problem="p4_g1")
     end
 
     if option ==2
