@@ -7,8 +7,8 @@ function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
     width, height = maximum(length.(strip.(rows))), length(rows)
     doors, keys, gems, human, colors = Const[], Const[], Const[], Const[], Const[]
     push!(human, Const(Symbol("agent")))
-    key_dict=Dict('r' =>  Const(Symbol("red")) , 'b' =>  Const(Symbol("blue")), 'y' =>  Const(Symbol("yellow")) , 'e' =>  Const(Symbol("green")), 'p' => Const(Symbol("pink")))
-    door_dict=Dict('R' =>  Const(Symbol("red")) , 'B' =>  Const(Symbol("blue")), 'Y' =>  Const(Symbol("yellow")) , 'E' =>  Const(Symbol("green")), 'P' => Const(Symbol("pink")))
+    key_dict=Dict('r' =>  Const(Symbol("red")) , 'b' =>  Const(Symbol("blue")), 'y' =>  Const(Symbol("yellow")) , 'g' =>  Const(Symbol("green")), 'p' => Const(Symbol("pink")))
+    door_dict=Dict('R' =>  Const(Symbol("red")) , 'B' =>  Const(Symbol("blue")), 'Y' =>  Const(Symbol("yellow")) , 'G' =>  Const(Symbol("green")), 'P' => Const(Symbol("pink")))
     walls = parse_pddl("(= walls (new-bit-matrix false $height $width))")
     init = Term[walls]
     append!(init, parse_pddl("(= (agentcode human) 0)","(= (agentcode robot) 1)","(= turn 0)"))
@@ -38,11 +38,11 @@ function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
                 # print(c)
                 # print(typeof(c))
                 push!(init, parse_pddl("(iscolor $k $c)"))
-            elseif char == 'g' || char == 'G' # Gem
-                g = Const(Symbol("gem$(length(gems)+1)"))
+            elseif char == 'c' 
+                g = Const(Symbol("goal$(length(gems)+1)"))
                 push!(gems, g)
                 append!(init, parse_pddl("(= (xloc $g) $x)", "(= (yloc $g) $y)"))
-                if char == 'G' goal = parse_pddl("(has human $g)") end
+                goal = parse_pddl("(has human $g)")
             elseif char == 'h' # Start position
                 start_human = parse_pddl("(= (xloc human) $x)", "(= (yloc human) $y)")
             end
