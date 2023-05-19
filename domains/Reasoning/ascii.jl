@@ -5,9 +5,8 @@ using PDDL
 function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
     rows = split(str, "\n", keepempty=false)
     width, height = maximum(length.(strip.(rows))), length(rows)
-    doors, keys, gems, robot, human, colors = Const[], Const[], Const[],Const[], Const[], Const[]
-    push!(robot, Const(Symbol("robot")))
-    push!(human, Const(Symbol("human")))
+    doors, keys, gems, human, colors = Const[], Const[], Const[], Const[], Const[]
+    push!(human, Const(Symbol("agent")))
     key_dict=Dict('r' =>  Const(Symbol("red")) , 'b' =>  Const(Symbol("blue")), 'y' =>  Const(Symbol("yellow")) , 'e' =>  Const(Symbol("green")), 'p' => Const(Symbol("pink")))
     door_dict=Dict('R' =>  Const(Symbol("red")) , 'B' =>  Const(Symbol("blue")), 'Y' =>  Const(Symbol("yellow")) , 'E' =>  Const(Symbol("green")), 'P' => Const(Symbol("pink")))
     walls = parse_pddl("(= walls (new-bit-matrix false $height $width))")
@@ -46,8 +45,6 @@ function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
                 if char == 'G' goal = parse_pddl("(has human $g)") end
             elseif char == 'h' # Start position
                 start_human = parse_pddl("(= (xloc human) $x)", "(= (yloc human) $y)")
-            elseif char == 'm'
-                start_robot = parse_pddl("(= (xloc robot) $x)", "(= (yloc robot) $y)")
             end
         end
     end
@@ -57,11 +54,10 @@ function ascii_to_pddl(str::String, name="doors-keys-gems-problem")
                      Dict(k => :key for k in keys),
                      Dict(g => :gem for g in gems),
                      Dict(c => :color for c in colors),
-                     Dict(h => :human for h in human),
-                     Dict(m => :robot for m in robot))
+                     Dict(h => :human for h in human))
 
     problem = GenericProblem(Symbol(name), Symbol("doors-keys-gems"),
-                             [doors; keys; gems; colors; robot; human], objtypes, init, goal,
+                             [doors; keys; gems; colors; human], objtypes, init, goal,
                              nothing, nothing)
     return problem
 end

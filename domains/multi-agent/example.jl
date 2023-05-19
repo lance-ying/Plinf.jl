@@ -1,4 +1,4 @@
-using Julog, PDDL, Gen, Printf
+using Julog, PDDL, Gen, Printf, PDDLViz
 using Plinf
 
 include("utils.jl")
@@ -6,35 +6,36 @@ include("ascii.jl")
 include("render.jl")
 
 #--- Initial Setup ---#
-costs = (pickup=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6)
+costs = (pickuph=1.0,pickupr=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6)
 # Register PDDL array theory
 PDDL.Arrays.register!()
 
 # Load domain and problem
 path = joinpath(dirname(pathof(Plinf)), "..", "domains", "multi-agent")
 domain = load_domain(joinpath(path, "domain.pddl"))
-problem = load_problem(joinpath(path, "p1.pddl"))
+problem = load_problem(joinpath(path, "p6.pddl"))
 
 # Initialize state, set goal and goal colors
 state = initstate(domain, problem)
 start_pos = Dict("human"=>(state[pddl"(xloc human)"], state[pddl"(yloc human)"]), "robot"=>(state[pddl"(xloc robot)"], state[pddl"(yloc robot)"]))
 goal = [problem.goal]
-spec = MinActionCosts(goal, costs)
-goal_colors = [colorant"#D41159", colorant"#FFC20A", colorant"#1A85FF"]
-gem_terms = @pddl("gem1", "gem2", "gem3")
-gem_colors = Dict(zip(gem_terms, goal_colors))
 
+goal = [@pddl("(has human gem3)")]
+spec = MinActionCosts(goal, costs)
+
+num_gems=4
+goal_colors, gem_terms, gem_colors = generate_gems(num_gems)
 #--- Visualize Plans ---#
 
 # Check that A* heuristic search correctly solves the problem
-planner
+
 planner = AStarPlanner(heuristic=GemHeuristic())
 plan, traj = planner(domain, state, spec)
 println("== Plan ==")
 display(plan)
 plt = render(state; start=start_pos, plan=plan, gem_colors=gem_colors)
 anim = anim_traj(traj; start_pos=start_pos, gem_colors=gem_colors, plan=plan)
-@assert satisfy(domain, traj[end], goal) == true
+ @assert satisfy(domain, traj[end], goal) == true
 
 # Visualize full horizon probabilistic A* search
 planner = ProbAStarPlanner(heuristic=GoalCountHeuristic(), trace_states=true)

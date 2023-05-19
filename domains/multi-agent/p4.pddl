@@ -4,7 +4,8 @@
             key1 key2 - key
             gem1 gem2 gem3 gem4 - gem
             red yellow - color
-            human robot - agent)
+            human - human
+            robot - robot)
   (:init (= (walls) (new-bit-matrix false 9 9))
          (= (agentcode human) 0)
          (= (agentcode robot) 1)

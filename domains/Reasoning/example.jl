@@ -1,55 +1,44 @@
 using Julog, PDDL, Gen, Printf
 using Plinf
 
-include("render.jl")
 include("utils.jl")
 include("ascii.jl")
-
-costs = (pickup=1.0,handover=0.9, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.5)
+include("render.jl")
 
 #--- Initial Setup ---#
-
+costs = (pickuph=1.0,pickupr=1.0,handover=1.0, unlock=1.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6)
 # Register PDDL array theory
 PDDL.Arrays.register!()
 
 # Load domain and problem
-path = joinpath(dirname(pathof(Plinf)), "..", "domains", "multi-agent")
+path = joinpath(dirname(pathof(Plinf)), "..", "domains", "reasoning")
 domain = load_domain(joinpath(path, "domain.pddl"))
-problem = load_problem(joinpath(path, "p5.pddl"))
+problem = load_problem(joinpath(path, "social.pddl"))
 
 # Initialize state, set goal and goal colors
 state = initstate(domain, problem)
-start_pos = Dict("human"=>(state[pddl"(xloc human)"], state[pddl"(yloc human)"]), "robot"=>(state[pddl"(xloc robot)"], state[pddl"(yloc robot)"]))
+start_pos = Dict("human"=>(state[pddl"(xloc human)"], state[pddl"(yloc human)"]))
 goal = [problem.goal]
-# goal=[pddl"(not (locked door2))"]
+
+goal = [@pddl("(has human gem1)")]
 spec = MinActionCosts(goal, costs)
 
 num_gems=4
 goal_colors, gem_terms, gem_colors = generate_gems(num_gems)
-
-plt = render(state; start=start_pos, gem_colors=gem_colors)
-
-
 #--- Visualize Plans ---#
 
-
 # Check that A* heuristic search correctly solves the problem
+
 planner = AStarPlanner(heuristic=GemHeuristic())
 plan, traj = planner(domain, state, spec)
-
-
-spec = MinActionCosts([pddl"(has human gem1)"], costs)
-plan, traj = planner(domain, state, spec)
-# plan = Term[pddl"(right human)", pddl"(left robot)", pddl"(right human)", pddl"(up robot)", pddl"(right human)", pddl"(noop robot)", pddl"(down human)", pddl"(noop robot)", pddl"(down human)", pddl"(pickup robot key2)", pddl"(down human)", pddl"(down robot)", pddl"(left human)", pddl"(left robot)", pddl"(left human)", pddl"(left robot)", pddl"(pickup human key4)", pddl"(left robot)", pddl"(right human)", pddl"(left robot)", pddl"(right human)", pddl"(left robot)", pddl"(up human)", pddl"(left robot)", pddl"(up human)", pddl"(left robot)", pddl"(up human)", pddl"(up robot)", pddl"(up human)", pddl"(unlock robot key2 door4)", pddl"(up human)", pddl"(noop robot)", pddl"(up human)", pddl"(noop robot)", pddl"(right human)", pddl"(noop robot)", pddl"(right human)", pddl"(noop robot)", pddl"(right human)"]
-# traj = PDDL.simulate(domain, state, plan)
-
-
 println("== Plan ==")
 display(plan)
+plan = @pddl("(left human)","(left human)")
+traj = PDDL.simulate(domain, state, plan)
 
-plt = render(state; start=start_pos, plan=plan, gem_colors=gem_colors)
+plt = render(state; start=start_pos, gem_colors=gem_colors)
 anim = anim_traj(traj; start_pos=start_pos, gem_colors=gem_colors, plan=plan)
-@assert satisfy(domain, traj[end], goal) == true
+ @assert satisfy(domain, traj[end], goal) == true
 
 # Visualize full horizon probabilistic A* search
 planner = ProbAStarPlanner(heuristic=GoalCountHeuristic(), trace_states=true)
@@ -76,7 +65,7 @@ anim = anim_traj(trajs, plt; alpha=0.1, gem_colors=gem_colors)
 #--- Goal Inference Setup ---#
 
 # Specify possible goals
-goals = return_goals(num_gems)
+goals = @pddl("(has human gem1)", "(has human gem2)","(has human gem3)")
 goal_idxs = collect(1:length(goals))
 goal_names = [repr(g) for g in goals]
 
@@ -99,7 +88,8 @@ agent_config = AgentConfig(domain, agent_planner, act_noise=act_noise)
 
 # Define observation noise model
 obs_params = observe_params(
-    # (pddl"(xpos)", normal, 1.0), (pddl"(ypos)", normal, 1.0),
+    (pddl"(xloc human)", normal, 1.0), (pddl"(yloc human)", normal, 1.0),
+    (pddl"(xloc robot)", normal, 1.0), (pddl"(yloc robot)", normal, 1.0),
     (pddl"(forall (?d - door) (locked ?d))", 0.05),
     (pddl"(forall (?i - item) (has ?i))", 0.05),
     (pddl"(forall (?i - item) (offgrid ?i))", 0.05),
@@ -112,24 +102,15 @@ world_init = WorldInit(agent_init, state, state)
 world_config = WorldConfig(domain, agent_config, obs_params)
 
 # Construct a trajectory with backtracking to perform inference on
-plan1, traj = planner(domain, state, pddl"(has robot key1)")
-plan2, traj = planner(domain, traj[end], MinActionCosts([pddl"(has human gem3)"], costs))
-plan3, traj = planner(domain, traj[end], MinActionCosts([pddl"(has human gem3)"], costs))
+# plan1, traj = planner(domain, state, pddl"(has  key2)")
+# plan2, traj = planner(domain, traj[end], pddl"(not (locked door2))")
+# plan3, traj = planner(domain, traj[end], pddl"(has key1)")
 # plan4, traj = planner(domain, traj[end], pddl"(has gem3)")
-plan1 = @pddl("(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(pickup robot key1)", "(noop human)", "(left robot)", "(noop human)", "(down robot)", "(noop human)", "(pickup robot key2)", "(noop human)", "(right robot)", "(noop human)", "(down robot)", "(noop human)", "(unlock robot key1 door3)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(right robot)", "(noop human)", "(pickup robot key3)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(handover robot human key3)", "(noop human)", "(handover robot human key2)") 
-
-plan1 = @pddl("(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)", "(left robot)", "(up human)")
-# plan1 = @pddl("(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(pickup robot key1)", "(noop human)", "(left robot)", "(noop human)", "(down robot)", "(noop human)", "(pickup robot key2)", "(noop human)", "(right robot)", "(noop human)", "(down robot)", "(noop human)", "(unlock robot key1 door3)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)",  "(left robot)", "(noop human)", "(left robot)",  "(noop human)", "(handover robot human key2)")
-# plan1 = @pddl("(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(pickup robot key1)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)",  "(down robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)","(left robot)", "(noop human)","(left robot)", "(noop human)")
-plan1 = collect(Term, plan1)
-
-traj = PDDL.simulate(domain, state, plan1) 
-# plan2, traj = planner(domain, traj[end], spec)
-
-plan = [plan1; plan2]
-plan = [plan1; plan2; plan3]
-plan, traj = planner(domain, state, pddl"(not(locked door1))")
+# plan = [plan1; plan2; plan3; plan4]
 # traj = PDDL.simulate(domain, state, plan)
+spec = MinActionCosts([pddl"(not (locked door2))"], costs)
+plan, traj = ProbAStarPlanner(heuristic=GoalCountHeuristic(), search_noise=0.1)(domain, state, spec)
+plan, traj = planner(domain, state, pddl"(not (locked door2))")
 
 # Visualize trajectory
 frames = []
@@ -170,7 +151,7 @@ plot_goal_bars!(goal_probs, goal_names, goal_colors)
 # Set up visualization and logging callbacks for online goal inference
 
 anim = Animation() # Animation to store each plotted frame
-keytimes = [4, 9, 17, 21] # Timesteps to save keyframes
+keytimes = [2, 4, 8, 12] # Timesteps to save keyframes
 keyframes = [] # Buffer of keyframes to plot as a storyboard
 goal_probs = [] # Buffer of goal probabilities over time
 plotters = [ # List of subplot callbacks:
@@ -180,6 +161,7 @@ plotters = [ # List of subplot callbacks:
     # plan_lengths_cb,
     # particle_weights_cb,
 ]
+# print(plotters)
 canvas = render(state; start=start_pos, show_objs=false)
 callback = (t, s, trs, ws) -> begin
     goal_probs_t = collect(values(sort!(get_goal_probs(trs, ws, goal_idxs))))
@@ -205,7 +187,7 @@ act_proposal = act_noise > 0 ? forward_act_proposal : nothing
 act_proposal_args = (act_noise*5,)
 
 # Run a particle filter to perform online goal inference
-n_samples = 10
+n_samples = 20
 traces, weights =
     world_particle_filter(world_init, world_config, traj, obs_terms, n_samples;
                           resample=true, rejuvenate=nothing,
@@ -219,10 +201,10 @@ gif(anim; fps=2)
 
 storyboard = plot_storyboard(
     keyframes, goal_probs, keytimes;
-    time_lims=(1, 27), legend=false,
-    titles=["Initially ambiguous goal",
-            "Red eliminated upon key pickup",
-            "Yellow most likely upon unlock",
-            "Switch to blue upon backtracking"],
+    time_lims=(1, 12), legend=false,
+    # titles=["Initially ambiguous goal",
+            # "Red eliminated upon key pickup",
+            # "Yellow most likely upon unlock",
+            # "Switch to blue upon backtracking"],
     goal_names=["Red Gem", "Yellow Gem", "Blue Gem"],
     goal_colors=goal_colors)

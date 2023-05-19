@@ -1,0 +1,71 @@
+;; ASCII ;;
+; W: wall, D: door, k: key, g: gem, G: goal-gem, s: start, .: empty
+; WWGWWWGWW
+; WW.WGW.WW
+; WWDW.WDWW
+; k......WW
+; WWDWWWWWW
+; WW.WWWWkW
+; s........
+; WWWW.WWWW
+; WWk....GW
+
+;; ASCII ;;
+; W: wall, D: door, k: key, g: gem, G: goal-gem, s: start, .: empty
+; WWWWWGWWWWWWWW
+; WWWWW.WWWWWWWW
+; WWWWWDWWWWWWWW
+; WG.......GWWWW
+; W.WWWWWWW.WWWW
+; WDWWWWWWWDWWWW
+; k............D
+; WWWDWWWWWWWWWW
+; WWW.WWWWWWkWWW
+; s............k
+; WWW.WWWWWW.WWW
+; WWW.WWWWWWDWWW
+; Wk..WWWWWW.D.G
+
+
+;; ASCII ;;
+; W: wall, D: door, k: key, g: gem, G: goal-gem, s: start, .: empty
+; g..W...g
+; k..D.Wk.
+; .WWWWWWD
+; .W..D.W.
+; .W..W.W.
+; ....W.W.
+; WWW.W.W.
+; s...W..G
+
+
+WWWWWW.kk.
+WWWWWWk..k
+gWgWWW...k
+.W.WWWW.WW
+DWDWWWW.WW
+.D..WWW...
+WWs.....WW
+WWDWWWWWWW
+GD...D..Dg
+
+
+kk.....Dg
+WWWW.WWWW
+WWWW.WWWW
+WWWW.WWWW
+.......D.
+.WWW.WWW.
+.WWWsWWWD
+.WWW.WWW.
+gWWWgWWWG
+
+
+
+WWWWWWWW
+WWWWWk.k
+WWWWWW.W
+GWWWWWDW
+D..s....
+WWW.WWWW
+gD.....g
