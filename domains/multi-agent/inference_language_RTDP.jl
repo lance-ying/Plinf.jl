@@ -9,12 +9,9 @@ using GenGPT3
 
 include("utils.jl")
 include("ascii.jl")
-include("render_new.jl")
+include("render.jl")
 
-ENV["OPENAI_API_KEY"] = "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"
 gpt3 = GPT3GF(model="text-babbage-001")
-
-
 
 examples = """
 Input: (unlock robot key2 door1) where (is-color door1 blue)
@@ -119,9 +116,6 @@ end
     
 end
 
-
-
-
 #--- Initial Setup ---#
 plan_dict=Dict("p1_g1"=>@pddl("(noop human)", "(left robot)", "(noop human)", "(left robot)", "(up human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(up human)", "(left robot)", "(left human)", "(left robot)", "(left human)", "(up robot)", "(noop human)", "(pickupr robot key1)", "(noop human)", "(down robot)", "(left human)", "(unlockr robot key1 door1)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(pickuph human gem1)"),
 "p1_g2"=>@pddl("(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(up robot)", "(noop human)", "(pickupr robot key2)", "(noop human)", "(down robot)", "(noop human)", "(right robot)", "(up human)", "(right robot)", "(up human)", "(right robot)", "(right human)", "(right robot)", "(right human)", "(unlockr robot key2 door2)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(pickuph human gem2)"),
@@ -175,43 +169,6 @@ goal = [@pddl("(has human gem3)")]
 
 spec = MinActionCosts(collect(Term, goal), costs)
 
-#--- Define Renderer ---#
-
-# Construct gridworld renderer
-gem_colors = PDDLViz.colorschemes[:vibrant]
-
-renderer = PDDLViz.GridworldRenderer(
-    resolution = (600, 700),
-    has_agent = false,
-    # agent_renderer = (d, s) -> HumanGraphic(color=:black),
-    obj_renderers = Dict(
-        :agent => (d, s, o) -> o.name == :human ?
-            HumanGraphic() : RobotGraphic(),
-        :key => (d, s, o) -> KeyGraphic(
-            color=colordict[get_obj_color(s, o).name]
-        ),
-        :door => (d, s, o) -> LockedDoorGraphic(
-            visible=s[Compound(:locked, [o])],
-            color=colordict[get_obj_color(s, o).name]
-        ),
-        :gem => (d, s, o) -> GemGraphic(
-            color=gem_colors[parse(Int, string(o.name)[end])]
-        )
-    ),
-    obj_type_z_order = [:door, :key, :gem, :agent],
-    show_inventory = true,
-    inventory_fns = [
-        (d, s, o) -> s[Compound(:has, [Const(:human), o])],
-        (d, s, o) -> s[Compound(:has, [Const(:robot), o])]
-    ],
-    inventory_types = [:item, :item],
-    inventory_labels = ["Human", "Robot"],
-    trajectory_options = Dict(
-        :tracked_objects => [Const(:human), Const(:robot)],
-        :tracked_types => Const[],
-        :object_colors => [:black, :slategray]
-    )
-)
 # Visualize initial state
 canvas = renderer(domain, state)
 

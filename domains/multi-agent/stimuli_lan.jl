@@ -1,11 +1,10 @@
 using Julog, PDDL, Gen, Printf
 using Plinf
 
-include("render_new.jl")
-# include("render.jl")
 include("utils.jl")
-include("ascii.jl")
+include("render.jl")
 
+# Register PDDL array extension
 PDDL.Arrays.register!()
 
 # Load domain and problem

@@ -4,6 +4,16 @@ using Base: @kwdef
 
 import SymbolicPlanners: compute, get_goal_terms
 
+"Returns the color of an object."
+function get_obj_color(state::State, obj::Const)
+    for color in PDDL.get_objects(state, :color)
+        if state[Compound(:iscolor, Term[obj, color])]
+            return color
+        end
+    end
+    return Const(:none)
+end
+
 "Returns the location of an object."
 function get_obj_loc(state::State, obj::Const; check_has::Bool=false)
     x = state[Compound(:xloc, Term[obj])]

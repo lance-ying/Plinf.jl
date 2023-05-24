@@ -8,12 +8,9 @@ using GenGPT3
 
 include("utils.jl")
 include("ascii.jl")
-include("render_new.jl")
+include("render.jl")
 
-ENV["OPENAI_API_KEY"] = "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"
 gpt3 = GPT3GF(model="text-babbage-001")
-
-
 
 examples = """
 Input: (unlockr robot key2 door1) where (is-color door1 blue) (is-color key2 blue)
@@ -135,8 +132,6 @@ plan_dict=Dict("p1_g1"=>@pddl("(noop human)", "(left robot)", "(noop human)", "(
 #--- Initial Setup ---#
 costs = (pickuph=1.0,pickupr=1.0,handover=1.0, unlockh=1.0, unlockr=10.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6)
 
-
-
 # Register PDDL array theory
 PDDL.Arrays.register!()
 
@@ -152,43 +147,6 @@ goal = [problem.goal]
 
 spec = MinActionCosts(collect(Term, goal), costs)
 
-#--- Define Renderer ---#
-
-# Construct gridworld renderer
-gem_colors = PDDLViz.colorschemes[:vibrant]
-
-renderer = PDDLViz.GridworldRenderer(
-    resolution = (600, 700),
-    has_agent = false,
-    # agent_renderer = (d, s) -> HumanGraphic(color=:black),
-    obj_renderers = Dict(
-        :agent => (d, s, o) -> o.name == :human ?
-            HumanGraphic() : RobotGraphic(),
-        :key => (d, s, o) -> KeyGraphic(
-            color=colordict[get_obj_color(s, o).name]
-        ),
-        :door => (d, s, o) -> LockedDoorGraphic(
-            visible=s[Compound(:locked, [o])],
-            color=colordict[get_obj_color(s, o).name]
-        ),
-        :gem => (d, s, o) -> GemGraphic(
-            color=gem_colors[parse(Int, string(o.name)[end])]
-        )
-    ),
-    obj_type_z_order = [:door, :key, :gem, :agent],
-    show_inventory = true,
-    inventory_fns = [
-        (d, s, o) -> s[Compound(:has, [Const(:human), o])],
-        (d, s, o) -> s[Compound(:has, [Const(:robot), o])]
-    ],
-    inventory_types = [:item, :item],
-    inventory_labels = ["Human", "Robot"],
-    trajectory_options = Dict(
-        :tracked_objects => [Const(:human), Const(:robot)],
-        :tracked_types => Const[],
-        :object_colors => [:black, :slategray]
-    )
-)
 # Visualize initial state
 canvas = renderer(domain, state)
 
