@@ -4,40 +4,22 @@ using Base: @kwdef
 
 import SymbolicPlanners: compute, get_goal_terms
 
-"Converts an (x, y) position to a corresponding goal term."
-pos_to_terms(pos::Tuple{Int, Int}) =
-    [parse_pddl("(== (xpos) $(pos[1]))"), parse_pddl("(== (ypos) $(pos[2]))")]
-
-"Gets the (x, y) position of the agent."
-get_agent_pos(state::State) = (state[pddl"(xpos)"], state[pddl"(ypos)"])
-
-# "Gets the (x, y) location of an object."
-# get_obj_loc(state::State, obj::Const) =
-#     (state[Compound(:xloc, Term[obj])], state[Compound(:yloc, Term[obj])])
-
-function get_obj_loc(state::State, obj::Const;
-    check_has::Bool=false, flip_y::Bool=false)
-    x, y = state[Compound(:xloc, Term[obj])], state[Compound(:yloc, Term[obj])]
-    if check_has && PDDL.get_objtype(state, obj) in [:gem, :key]
-        for agent in PDDL.get_objects(state, :human)
+"Returns the location of an object."
+function get_obj_loc(state::State, obj::Const; check_has::Bool=false)
+    x = state[Compound(:xloc, Term[obj])]
+    y = state[Compound(:yloc, Term[obj])]
+    # Check if object is held by an agent, and return agent's location if so
+    if check_has && PDDL.get_objtype(state, obj) in (:gem, :key)
+        agents = (PDDL.get_objects(state, :human)...,
+                  PDDL.get_objects(state, :robot)...)
+        for agent in agents
             if state[Compound(:has, Term[agent, obj])]
-                x, y = get_obj_loc(state, agent; flip_y=flip_y)
-                break
-            end
-        end
-        for agent in PDDL.get_objects(state, :robot)
-            if state[Compound(:has, Term[agent, obj])]
-                x, y = get_obj_loc(state, agent; flip_y=flip_y)
+                x, y = get_obj_loc(state, agent)
                 break
             end
         end
     end
-    if !flip_y
-        return (x, y)
-    else
-        height = size(state[pddl"(walls)"])[1]
-        return (x, height-y+1)
-    end
+    return (x, y)
 end
     
 """
@@ -51,7 +33,7 @@ goals to satisfy.
 struct GoalManhattan <: Heuristic end
 
 function compute(heuristic::GoalManhattan,
-    domain::Domain, state::State, spec::Specification)
+                 domain::Domain, state::State, spec::Specification)
   goals = get_goal_terms(spec)
   has_goals = [g for g in goals if g.name == :has]
   n_agents = length(PDDL.get_objects(state, :human)) +
@@ -64,7 +46,7 @@ function compute(heuristic::GoalManhattan,
       agent_loc = get_obj_loc(state, agent)
       agent_item_dist = sum(abs.(agent_loc .- item_loc))
       min_other_dist = Inf
-      for other in PDDL.get_objects(state, :agent)
+      for other in PDDL.get_objects(domain, state, :agent)
           other == agent && continue
           other_loc = get_obj_loc(state, other)
           other_dist = agent_item_dist
@@ -80,86 +62,6 @@ function compute(heuristic::GoalManhattan,
   min_dist = length(dists) > 0 ? minimum(dists) : 0
   return min_dist
 end
-
-
-# function get_obj_loc(state::State, obj::Const;
-#     check_has::Bool=false, flip_y::Bool=false)
-
-#     x, y = state[Compound(:xloc, Term[obj])], state[Compound(:yloc, Term[obj])]
-#     if check_has && PDDL.get_objtype(state, obj) in [:gem, :key]
-#         for agent in PDDL.get_objects(state, :agent)
-#             if state[Compound(:has, Term[agent, obj])]
-#                 x, y = get_obj_loc(state, agent; flip_y=flip_y)
-#                 break
-#             end
-#         end
-#     end
-#     if !flip_y
-#         return (x, y)
-#     else
-#         height = size(state[pddl"(walls)"])[1]
-#         return (x, height-y+1)
-#     end
-# end
-    
-# """
-#     GoalManhattan
-
-# Custom relaxed distance heuristic to goal objects. Estimates the cost of 
-# collecting all goal objects by computing the distance between all goal objects
-# and the agent, then returning the minimum distance plus the number of remaining
-# goals to satisfy.
-# """
-# struct GoalManhattan <: Heuristic end
-
-# function compute(heuristic::GoalManhattan,
-#                  domain::Domain, state::State, spec::Specification)
-#     # Count number of remaining goals to satisfy
-#     goal_count = GoalCountHeuristic()(domain, state, spec)
-#     # Determine goal objects to collect
-#     goals = get_goal_terms(spec)
-#     goal_objs = [g.args[1] for g in goals if g.name == :has]
-#     isempty(goal_objs) && return goal_count
-#     # Compute minimum distance to goal objects
-#     pos = get_agent_pos(state)
-#     min_dist = minimum(goal_objs) do obj
-#         loc = get_obj_loc(state, obj)
-#         sum(abs.(pos .- loc))
-#     end
-#     return min_dist + goal_count
-# end
-
-
-# function compute(heuristic::GoalManhattan,
-#     domain::Domain, state::State, spec::Specification)
-#   goals = get_goal_terms(spec)
-#   has_goals = [g for g in goals if g.name == :has]
-#   n_agents = length(PDDL.get_objects(state, :agent))
-#   noop_cost = spec isa MinActionCosts ? spec.costs[:noop] : 1
-#   dists = map(has_goals) do goal
-#       if state[goal] return 0 end
-#       # print(goal)
-#       agent, item = goal.args
-#       item_loc = get_obj_loc(state, item; check_has=true)
-#       agent_loc = get_obj_loc(state, agent)
-#       agent_item_dist = sum(abs.(agent_loc .- item_loc))
-#       min_other_dist = Inf
-#       for other in PDDL.get_objects(state, :agent)
-#           other == agent && continue
-#           other_loc = get_obj_loc(state, other)
-#           other_dist = agent_item_dist
-#           if !state[Compound(:has, Term[other, item])]
-#               other_item_dist = sum(abs.(other_loc .- item_loc))
-#               other_dist += other_item_dist * (n_agents - 1) + 1
-#           end
-#           min_other_dist = min(min_other_dist, other_dist)
-#       end
-#       agent_dist = agent_item_dist * (1 + noop_cost * (n_agents - 1))
-#       return min(agent_dist, min_other_dist)
-#   end
-#   min_dist = length(dists) > 0 ? minimum(dists) : 0
-#   return min_dist
-# end
 
 """
     RelaxedMazeDist([planner::Planner])
