@@ -4,6 +4,8 @@ authors = ["Xuan <tanqazx@gmail.com>"]
 version = "0.3.0"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
@@ -12,6 +14,7 @@ Gen = "ea4f424c-a589-11e8-07c0-fd5c91b9da4a"
 GenGPT3 = "bf5e1513-8b89-42fc-a2bc-387c809df403"
 GenParticleFilters = "56b76ac4-72ef-411e-b419-6d312ed86a6f"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 PDDL = "2c8894f9-daa1-498a-9e3a-26edd9623db8"
 PDDLViz = "8f72e95f-8ea1-4af3-8b89-086f52abff52"
