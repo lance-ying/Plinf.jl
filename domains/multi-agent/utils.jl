@@ -49,6 +49,8 @@ function compute(heuristic::GoalManhattan,
   n_agents = length(PDDL.get_objects(state, :human)) +
              length(PDDL.get_objects(state, :robot))
   noop_cost = spec isa MinActionCosts ? spec.costs[:noop] : 1
+  all_agents = (PDDL.get_objects(state, :human)...,
+                PDDL.get_objects(state, :robot)...)
   dists = map(has_goals) do goal
       if state[goal] return 0 end
       agent, item = goal.args
@@ -56,7 +58,7 @@ function compute(heuristic::GoalManhattan,
       agent_loc = get_obj_loc(state, agent)
       agent_item_dist = sum(abs.(agent_loc .- item_loc))
       min_other_dist = Inf
-      for other in PDDL.get_objects(domain, state, :agent)
+      for other in all_agents
           other == agent && continue
           other_loc = get_obj_loc(state, other)
           other_dist = agent_item_dist
@@ -89,7 +91,7 @@ function RelaxedMazeDist()
 end
 
 function RelaxedMazeDist(planner::Planner)
-    heuristic = PlannerHeuristic(planner, s_transform=unlock_doors)
+    heuristic = PlannerHeuristic(planner, s_transform=relax_state)
     heuristic = memoized(heuristic)
     return heuristic
 end
