@@ -31,7 +31,33 @@ function get_obj_loc(state::State, obj::Const; check_has::Bool=false)
     end
     return (x, y)
 end
-    
+
+"Rollout a planning solution to get a sequence of future actions."
+function rollout_sol(
+    domain::Domain, planner::Planner,
+    state::State, sol::Solution, spec::Specification;
+    max_steps::Int = 2^10
+)
+    # Special case handling of RTHS policies
+    if planner isa RTHS && sol isa TabularVPolicy
+        heuristic = planner.heuristic
+        planner.heuristic = PolicyValueHeuristic(sol)
+        search_sol = planner.planner(domain, state, spec)
+        planner.heuristic = heuristic
+        return collect(search_sol)
+    else # Otherwise just rollout the policy greedily
+        actions = Vector{Compound}()
+        for _ in 1:max_steps
+            act = best_action(sol, state)
+            if ismissing(act) break end
+            state = transition(domain, state, act)
+            push!(actions, act)
+            if is_goal(spec, domain, state) break end
+        end
+        return actions
+    end
+end
+
 """
     GoalManhattan
 
@@ -253,18 +279,16 @@ function (overlay::DKGInferenceOverlay)(
             belief_state = tr[:timestep => t => :agent => :belief]
             goal_state = tr[:timestep => t => :agent => :goal]
             plan_state = tr[:timestep => t => :agent => :plan]
+            # Get planner from agent configuration
+            plan_config = tr[:init][2].agent_config.plan_config
+            planner = plan_config.step_args[2]
             # Rollout planning solution until goal is reached
             state = convert(State, belief_state)
             spec = convert(Specification, goal_state)
             sol = plan_state.sol
-            future_states = Vector{typeof(state)}()
-            for _ in 1:overlay.max_future_steps
-                act = best_action(sol, state)
-                if ismissing(act) break end
-                state = transition(domain, state, act)
-                push!(future_states, state)
-                if is_goal(spec, domain, state) break end
-            end
+            future_actions = rollout_sol(domain, planner, state, sol, spec;
+                                         max_steps=overlay.max_future_steps)
+            future_states = PDDL.simulate(domain, state, future_actions)
             # Render or update future states
             color = overlay.trace_color_fn(tr)
             future_obs = get(overlay.future_obs, i, nothing)

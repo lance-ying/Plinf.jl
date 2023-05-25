@@ -9,7 +9,7 @@ import PDDLViz: Animation, is_displayed
 
 # Define colors
 vibrant = PDDLViz.colorschemes[:vibrant]
-default_gem_colors = [to_color(:red), vibrant[2], colorant"#56b4e9", colorant"#009e73"]
+gem_colors = [to_color(:red), vibrant[2], colorant"#56b4e9", colorant"#009e73"]
 colordict = Dict(
     :red => vibrant[1],
     :yellow => vibrant[2],
@@ -21,7 +21,6 @@ colordict = Dict(
 )
 
 # Construct gridworld renderer
-gem_colors = PDDLViz.colorschemes[:vibrant]
 renderer = PDDLViz.GridworldRenderer(
     resolution = (600, 700),
     has_agent = false,
@@ -36,7 +35,7 @@ renderer = PDDLViz.GridworldRenderer(
             color=colordict[get_obj_color(s, o).name]
         ),
         :gem => (d, s, o) -> GemGraphic(
-            color=default_gem_colors[parse(Int, string(o.name)[end])]
+            color=gem_colors[parse(Int, string(o.name)[end])]
         )
     ),
     obj_type_z_order = [:door, :key, :gem, :agent],

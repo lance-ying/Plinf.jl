@@ -21,22 +21,40 @@ problem_id = 2
 domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
 problem = load_problem(joinpath(@__DIR__, "p$problem_id.pddl"))
 
-# Initialize state and construct goal specification
+# Initialize state
 state = initstate(domain, problem)
 
+# Define action costs
 costs = (
     pickuph=1.0, pickupr=1.0, handover=1.0, unlockh=1.0, unlockr=10.0, 
     up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
 )
+
+# Construct goal specification
 spec = MinActionCosts(Term[problem.goal], costs)
+
+# Compile and cache domain for faster performance
+domain, state = PDDL.compiled(domain, state)
+domain = CachedDomain(domain)
 
 # Visualize initial state
 canvas = renderer(domain, state)
 
+#--- Visualize Plans ---#
+
+# Check that A* heuristic search correctly solves the problem
+astar = AStarPlanner(GoalManhattan(), save_search=true)
+sol = astar(domain, state, spec)
+
+# Visualize solution 
+plan = collect(sol)
+anim = anim_plan(renderer, domain, state, plan)
+
 #--- Goal Inference Setup ---#
 
 # Specify possible goals
-goals = @pddl("(has human gem1)", "(has human gem2)", "(has human gem3)", "(has human gem4)")
+goals = @pddl("(has human gem1)", "(has human gem2)",
+              "(has human gem3)", "(has human gem4)")
 goal_idxs = collect(1:length(goals))
 goal_names = [write_pddl(g) for g in goals]
 goal_colors = gem_colors[goal_idxs]
@@ -51,14 +69,12 @@ end
 goal_addr = :init => :agent => :goal => :goal
 goal_strata = choiceproduct((goal_addr, 1:length(goals)))
 
-# Compile and cache domain for faster performance
-domain, state = PDDL.compiled(domain, state)
-domain = CachedDomain(domain)
-
 # Use RTHS planner that updates value estimates of all neighboring states
 # at each timestep, using full-horizon heuristic search to estimate the value
-heuristic = GoalManhattan()
-planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^32) 
+heuristic = memoized(GoalManhattan())
+planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^32)
+
+# Define agent configuration
 agent_config = AgentConfig(
     domain, planner;
     # Assume fixed goal over time
@@ -98,7 +114,7 @@ callback = DKGCombinedCallback(
     goal_addr = goal_addr,
     goal_names = ["gem1", "gem2", "gem3", "gem4"],
     goal_colors = goal_colors,
-    obs_trajectory = obs_traj,
+    obs_trajectory = PDDL.simulate(domain, state, plan),
     print_goal_probs = true,
     plot_goal_bars = false,
     plot_goal_lines = false,
@@ -121,5 +137,3 @@ n_samples = length(goals)
 # Create goal inference storyboard
 goal_probs = reduce(hcat, callback.logger.data[:goal_probs])
 writedlm("results/no_lan/p$(problem_id)_g$(goal_id).csv",  goal_probs, ',')
-# storyboard_goal_lines!(storyboard, goal_probs, [1,10, 20, 34], show_legend=true)
-# end
