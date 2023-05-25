@@ -32,12 +32,11 @@ plan_dict=Dict("p1_g1"=>@pddl("(noop human)", "(left robot)", "(noop human)", "(
 
 
 #--- Initial Setup ---#
-costs = (pickuph=1.0,pickupr=1.0,handover=1.0, unlockh=1.0, unlockr=10.0, up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6)
 
 # Register PDDL array theory
 PDDL.Arrays.register!()
 
-p = 5
+p = 2
 # Load domain and problem
 path = joinpath(dirname(pathof(Plinf)), "..", "domains", "multi-agent")
 domain = load_domain(joinpath(path, "domain.pddl"))
@@ -45,10 +44,12 @@ problem = load_problem(joinpath(path, "p$p.pddl"))
 
 # Initialize state and construct goal specification
 state = initstate(domain, problem)
-# spec = Specification(problem)
-goal = [problem.goal]
 
-spec = MinActionCosts(collect(Term, goal), costs)
+costs = (
+    pickuph=1.0, pickupr=1.0, handover=1.0, unlockh=1.0, unlockr=10.0, 
+    up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+)
+spec = MinActionCosts(Term[problem.goal], costs)
 
 # Visualize initial state
 canvas = renderer(domain, state)
@@ -64,7 +65,7 @@ goal_colors = gem_colors[goal_idxs]
 # Define uniform prior over possible goals
 @gen function goal_prior()
     goal ~ uniform_discrete(1, length(goals))
-    return MinActionCosts(collect(Term, [goals[goal]]), costs)
+    return MinActionCosts(Term[goals[goal]], costs)
 end
 
 # Construct iterator over goal choicemaps for stratified sampling
@@ -75,93 +76,68 @@ goal_strata = choiceproduct((goal_addr, 1:length(goals)))
 domain, state = PDDL.compiled(domain, state)
 domain = CachedDomain(domain)
 
-astar = AStarPlanner(GoalManhattan(), save_search=true)
-
-p_heuristic = memoized(PlannerHeuristic(astar))
-# Use RTDP planner that doesn't actually do planning,
-# just returns a policy where Q-values are estimated using `p_heuristic`
-planner = RTDP(heuristic=p_heuristic, n_rollouts=0) 
-
+# Use RTHS planner that updates value estimates of all neighboring states
+# at each timestep, using full-horizon heuristic search to estimate the value
+heuristic = GoalManhattan()
+planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^32) 
 agent_config = AgentConfig(
     domain, planner;
     # Assume fixed goal over time
     goal_config = StaticGoalConfig(goal_prior),
-    # Assume the agent randomly replans over time
+    # Assume the agent refines its policy at every timestep
     replan_args = (
-        prob_replan = 0, # Probability of replanning at each timestep
-        budget_dist = shifted_neg_binom, # Search budget distribution
-        budget_dist_args = (1000, 0.05, 1) # Budget distribution parameters
+        prob_replan = 0.0, # Probability of replanning at each timestep
+        prob_refine = 1.0, # Probability of refining solution at each timestep
+        rand_budget = false # Search budget is fixed everytime
     ),
-    # Assume a small amount of action noise
+    # Assume some Boltzmann action noise (reduce this to make inferences sharper)
     act_temperature = 2.5,
 )
 
-# Define observation noise model
-# Define observation noise model
-obs_params = ObsNoiseParams(
-    (pddl"(xloc human)", normal, 0.1), (pddl"(yloc human)", normal, 0.1),
-    (pddl"(xloc robot)", normal, 0.1), (pddl"(yloc robot)", normal, 0.1),
-    (pddl"(forall (?d - door) (locked ?d))", 0.05),
-    (pddl"(forall (?a - agent ?i - item) (has ?a ?i))", 0.05),
-    (pddl"(forall (?i - item) (offgrid ?i))", 0.05)
-)
-obs_params = ground_obs_params(obs_params, domain, state)
-obs_terms = collect(keys(obs_params))
-
-# Configure world model with planner, goal prior, initial state, and obs params
+# Configure world model with agent and environment configuration
 world_config = WorldConfig(
     agent_config = agent_config,
     env_config = PDDLEnvConfig(domain, state),
-    obs_config = MarkovObsConfig(domain, obs_params)
+    obs_config = PerfectObsConfig()
 )
 
-#--- Test Trajectory Generation ---#
+#--- Online Goal Inference ---#
 
-# Construct a trajectory with backtracking to perform inference on
-    trial = 1
+# Load observed actions to perform inference
+trial = 1
+index = "p$(p)_g$trial"
+plan = plan_dict[index]
+observations = act_choicemap_vec(plan)
+timesteps = collect(1:length(observations))
 
-    index = "p$(p)_g$trial"
-    plan = plan_dict[index]
-    obs_traj = PDDL.simulate(domain, state, plan)
+# Construct callback for logging data and visualizing inference
+callback = DKGCombinedCallback(
+    renderer, domain;
+    goal_addr = goal_addr,
+    goal_names = ["gem1", "gem2", "gem3", "gem4"],
+    goal_colors = goal_colors,
+    obs_trajectory = obs_traj,
+    print_goal_probs = true,
+    plot_goal_bars = false,
+    plot_goal_lines = false,
+    render = true,
+    inference_overlay = true,
+    record = false
+)
 
-    # Construct iterator over observation timesteps and choicemaps 
-    t_obs_iter = state_choicemap_pairs(obs_traj, obs_terms; batch_size=1)
+# Configure SIPS particle filter
+sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
 
+# Run particle filter to perform online goal inference
+n_samples = length(goals)
+@time pf_state = sips(
+    n_samples,  observations, timesteps;
+    init_args=(init_strata=goal_strata,),
+    callback=callback
+);
 
-    observations = act_choicemap_vec(plan)
-
-    #--- Online Goal Inference ---#
-
-    # Construct callback for logging data and visualizing inference
-    callback = DKGCombinedCallback(
-        renderer, domain;
-        goal_addr = goal_addr,
-        goal_names = ["gem1", "gem2", "gem3", "gem4"],
-        goal_colors = goal_colors,
-        obs_trajectory = obs_traj,
-        print_goal_probs = true,
-        plot_goal_bars = false,
-        plot_goal_lines = false,
-        render = false,
-        inference_overlay = false,
-        record = false
-    )
-    timesteps = collect(1:length(observations))
-    # Configure SIPS particle filter
-    sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none,
-                rejuv_kernel=ReplanKernel(2), period=2)
-
-    # Run particle filter to perform online goal inference
-    n_samples = 4
-    @time pf_state = sips(
-        n_samples,  observations, timesteps;
-        init_args=(init_strata=goal_strata,),
-        callback=callback
-    );
-
-
-    # Create goal inference storyboard
-    goal_probs = reduce(hcat, callback.logger.data[:goal_probs])
-    writedlm("results/no_lan/p$(p)_g$(trial).csv",  goal_probs, ',')
-    # storyboard_goal_lines!(storyboard, goal_probs, [1,10, 20, 34], show_legend=true)
+# Create goal inference storyboard
+goal_probs = reduce(hcat, callback.logger.data[:goal_probs])
+writedlm("results/no_lan/p$(p)_g$(trial).csv",  goal_probs, ',')
+# storyboard_goal_lines!(storyboard, goal_probs, [1,10, 20, 34], show_legend=true)
 # end

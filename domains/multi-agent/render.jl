@@ -9,7 +9,7 @@ import PDDLViz: Animation, is_displayed
 
 # Define colors
 vibrant = PDDLViz.colorschemes[:vibrant]
-default_gem_colors = [:red, vibrant[2], colorant"#56b4e9", colorant"#009e73"]
+default_gem_colors = [to_color(:red), vibrant[2], colorant"#56b4e9", colorant"#009e73"]
 colordict = Dict(
     :red => vibrant[1],
     :yellow => vibrant[2],
