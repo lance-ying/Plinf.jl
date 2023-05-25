@@ -65,10 +65,15 @@ end
     state = env_state
     sol = agent_state.plan_state.sol
     spec = convert(Specification, agent_state.goal_state)
-    # Rollout planning solution to get future plan
-    future_plan = rollout_sol(domain, planner, state, sol, spec)
-    # Extract salient actions and predicates from plan
-    actions, predicates = extract_salient_actions(state, future_plan)
+    if t > 1 # Avoid rolling out plan at subsequent time steps
+        actions = Term[]
+        predicates = Term[]
+    else
+        # Rollout planning solution to get future plan
+        future_plan = rollout_sol(domain, planner, state, sol, spec)
+        # Extract salient actions and predicates from plan
+        actions, predicates = extract_salient_actions(state, future_plan)
+    end
     # Decide whether utterance should be communicated
     p_utterance = isempty(actions) ? 0.05 : 0.95
     sample_utterance ~ bernoulli(p_utterance)

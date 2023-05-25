@@ -134,6 +134,5 @@ n_samples = length(goals)
     callback=callback
 );
 
-# Create goal inference storyboard
+# Extract goal probabilities
 goal_probs = reduce(hcat, callback.logger.data[:goal_probs])
-writedlm("results/no_lan/p$(problem_id)_g$(goal_id).csv",  goal_probs, ',')

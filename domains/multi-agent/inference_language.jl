@@ -148,8 +148,20 @@ pf_state = sips(
     callback=callback
 );
 
+# Extract goal probabilities
 goal_probs = reduce(hcat, callback.logger.data[:goal_probs])
-writedlm("results/lan/p$(problem_id)_g$(goal_id)_lan.csv",  goal_probs, ',')
+
+# Extract log likelihoods of observed utterance
+utterance_addr = :timestep => 1 => :act => :utterance => :output
+sample_utterance_addr = :timestep => 1 => :act => :sample_utterance
+sel = Gen.select(utterance_addr, sample_utterance_addr)
+utterance_logprobs = map(pf_state.traces) do trace
+    return project(trace, sel)
+end
+
+# Set initial state probabilities to goal posterior given utterance
+utterance_probs = GenParticleFilters.softmax(utterance_logprobs)
+goal_probs[:, 1] = utterance_probs
 
 # Extract animation
 anim = callback.record.animation
@@ -163,5 +175,4 @@ storyboard = render_storyboard(
     xlabels = ["t = $t" for t in times],
     xlabelsize = 20, subtitlesize = 24
 );
-goal_probs = reduce(hcat, callback.logger.data[:goal_probs])
 storyboard_goal_lines!(storyboard, goal_probs, times, show_legend=true)
