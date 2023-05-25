@@ -205,7 +205,7 @@ function DKGCombinedCallback(
         )
     end
     # Construct recording callback
-    if record
+    if record && render
         callbacks[:record] = RecordCallback(figure, framerate=framerate,
                                             format=format)
     end
