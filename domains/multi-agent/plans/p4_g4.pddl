@@ -1,4 +1,4 @@
-; Pass me the red and yellow key.
+; Pass me the red key.
 (noop human)
 (up robot)
 (noop human)
