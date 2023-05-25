@@ -71,25 +71,6 @@ selects the best action.
     return act
 end
 
-
-"""
-    eps_greedy_act_step(t, agent_state, env_state, domain, epsilon)
-
-Samples an available action uniformly at random `epsilon` of the time, otherwise
-selects the best action.
-"""
-# @gen function eps_greedy_act_step(t, agent_state, env_state,
-#                                   domain::Domain, epsilon::Real)
-#     plan_state = agent_state.plan_state::PlanState
-#     if plan_state.sol isa NullSolution # Goal proven to be unreachable
-#         policy = RandomPolicy(domain) # Create random policy
-#     else
-#         policy = EpsilonGreedyPolicy(domain, plan_state.sol, epsilon)
-#     end    
-#     act = {:act} ~ policy_dist(policy, env_state)
-#     return act
-# end
-
 # Boltzmann action selection #
 
 """
