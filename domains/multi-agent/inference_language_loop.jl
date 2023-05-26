@@ -8,6 +8,7 @@ include("utils.jl")
 include("ascii.jl")
 include("render.jl")
 include("load_plans.jl")
+include("utterance_model.jl")
 
 # Register PDDL array theory
 PDDL.Arrays.register!()
@@ -108,18 +109,13 @@ for (problem_id, problem) in enumerate(problems)
             observations[t][:timestep => t => :act => :sample_utterance] = false
         end
 
-        # Define reference to heuristic computed from previous runs
-        cached_heuristic = nothing
-
         # Iterate over temperatures
         for temperature in TEMPERATURES
             println("Temperature: $temperature ($plan_id)\n")
             # Use RTHS planner that updates value estimates of all neighboring states
             # at each timestep, using full-horizon heuristic search to estimate the value
-            heuristic = isnothing(cached_heuristic) ? 
-                memoized(GoalManhattan()) : cached_heuristic
-            n_iters = isnothing(cached_heuristic) ? 1 : 0
-            planner = RTHS(heuristic=heuristic, n_iters=n_iters, max_nodes=2^32)
+            heuristic = memoized(GoalManhattan())
+            planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^32)
 
             # Define agent configuration
             agent_config = AgentConfig(
@@ -189,6 +185,7 @@ for (problem_id, problem) in enumerate(problems)
             # Set initial state probabilities to goal posterior given utterance
             utterance_probs = GenParticleFilters.softmax(utterance_logprobs)
             goal_probs[:, 1] = utterance_probs
+            log_ml_est[1] = logsumexp(utterance_logprobs) - log(n_samples)
 
             # Compute Brier score
             true_goal_indicator = zeros(size(goal_probs))
@@ -220,16 +217,6 @@ for (problem_id, problem) in enumerate(problems)
 
             # Append results to dataframe
             append!(df, new_df)
-
-            # Update cached heuristic by extracting final policies
-            if isnothing(cached_heuristic)
-                policies = map(pf_state.traces) do trace
-                    final_plan_state = get_agent_states(trace)[end].plan_state
-                    return final_plan_state.sol
-                end
-                cached_heuristic =
-                    GoalDependentPolicyHeuristic(Dict(zip(goal_specs, policies)))
-            end
             println()
         end
     end

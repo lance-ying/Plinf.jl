@@ -4,7 +4,7 @@ using PDDL, SymbolicPlanners
 include("utils.jl")
 
 # Define GPT-3 generative function
-gpt3 = GPT3GF(model="text-babbage-001", stop="\n")
+gpt3 = GPT3GF(model="curie", stop="\n")
 
 # Example translations from salient actions to instructions/requests
 utterance_examples = """

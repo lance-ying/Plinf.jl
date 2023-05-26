@@ -7,6 +7,7 @@ using DelimitedFiles
 include("utils.jl")
 include("ascii.jl")
 include("render.jl")
+include("load_plans.jl")
 include("utterance_model.jl")
 
 #--- Initial Setup ---#
@@ -15,7 +16,7 @@ include("utterance_model.jl")
 PDDL.Arrays.register!()
 
 # Set problem to load
-problem_id = 2
+problem_id = 4
 
 # Load domain and problem
 domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
@@ -106,7 +107,7 @@ world_config = WorldConfig(
 plans, utterances, splitpoints = load_plan_dataset(joinpath(@__DIR__, "plans"))
 
 # Construct choicemap of observed actions to perform inference
-goal_id = 1
+goal_id = 4
 index = "p$(problem_id)_g$(goal_id)"
 plan = plans[index]
 observations = act_choicemap_vec(plan)
