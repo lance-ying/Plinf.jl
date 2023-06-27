@@ -36,14 +36,14 @@ df_path = joinpath(@__DIR__, "human_language_results.csv")
 human_lang_df = CSV.read(df_path, DataFrame, header=[1, 2])
 rename!(human_lang_df, 1 => :problem_id, 2 => :goal_id, 3 => :timestep)
 
+## Plot stimuli storyboards on their own
+
 # Loop over problems
 plan_ids = sort!(collect(keys(plans)))
 for plan_index in plan_ids
     m = match(r"p(\d+)_g(\d+)", plan_index).captures
     problem_id = parse(Int, m[1])
     goal_id = parse(Int, m[2])
-
-    problem_id < 3 && continue
 
     plan = plans[plan_index]
     utterance = utterances[plan_index]
@@ -65,14 +65,104 @@ for plan_index in plan_ids
     state = initstate(domain, problems[problem_id])
     grid = state[pddl"(walls)"]
     height, width = size(grid)
-    renderer.resolution = (width * 100 + 40, (height + 2) * 100 + 200)
+    renderer.resolution = (width * 100, (height + 2) * 100 + 200)
+
+    # Initialize canvas for animation
+    canvas = new_canvas(renderer)
+    canvas = anim_initialize!(
+        canvas, renderer, domain, state;
+        caption = "Human: " * utterance, caption_size = 32,
+        trail_length = 12
+    )
+    canvas.blocks[2].titlesize = 30
+    canvas.blocks[3].titlesize = 30
+    display(canvas)
+
+    # Animate plan
+    anim = anim_plan!(
+        canvas, renderer, domain, state, plan;
+        trail_length=10,
+        format = "gif",
+        captions=Dict(1 => "Human: " * utterance, times[2] => "...")
+    )
+
+    # Switch to CairoMakie for plotting
+    CairoMakie.activate!()
+
+    # Plot storyboard
+    storyboard = render_storyboard(
+        anim, times;
+        xlabels = ["t = $t" for t in times],
+        xlabelsize = 36, xlabelfont = :italic
+    );
+
+    n_frames = length(times)
+    for i in 1:n_frames
+        colsize!(storyboard.layout, i, width * 100)
+    end
+    colgap!(storyboard.layout, 0.0)
+    ax = Axis(storyboard[1, n_frames+1])
+    hidedecorations!(ax)
+    hidespines!(ax)
+
+    # Add figure title
+    figtitle = Label(storyboard[0, :], "Environment $problem_id: Goal $goal_id")
+    figtitle.fontsize = 60
+    figtitle.font = :bold
+    figtitle.halign = :left
+
+    width, height = size(storyboard.scene)
+    resize!(storyboard, (5200, height+40))
+    
+    # Save figure
+    mkpath(joinpath(@__DIR__, "figures"))
+    path = joinpath(@__DIR__, "figures", "trajectory_p$(problem_id)_g$(goal_id)")
+    save(path * ".png", storyboard)
+    save(path * ".pdf", storyboard)
+    sleep(1.0)
+end
+
+## Plot goal inference storyboards for each stimulus
+
+# Loop over problems
+plan_ids = sort!(collect(keys(plans)))
+for plan_index in plan_ids
+    m = match(r"p(\d+)_g(\d+)", plan_index).captures
+    problem_id = parse(Int, m[1])
+    goal_id = parse(Int, m[2])
+
+    if problem_id != 6
+        continue
+    end
+
+    plan = plans[plan_index]
+    utterance = utterances[plan_index]
+    times = splitpoints[plan_index]
+
+    # Filter out results for this plan stimuli
+    filter_fn = r -> r.problem_id == problem_id && r.goal_id == goal_id && (r.is_judgment_point || r.timestep == length(plan))
+    model_no_lang_sub_df = filter(filter_fn, model_no_lang_df)
+    model_lang_sub_df = filter(filter_fn, model_lang_df)
+
+    filter_fn = r -> r.problem_id == problem_id && r.goal_id == goal_id
+    human_no_lang_sub_df = filter(filter_fn, human_no_lang_df)
+    human_lang_sub_df = filter(filter_fn, human_lang_df)
+
+    # Use GLMakie for rendering
+    GLMakie.activate!()
+
+    # Initialize state, and set renderer resolution to fit state grid
+    state = initstate(domain, problems[problem_id])
+    grid = state[pddl"(walls)"]
+    height, width = size(grid)
+    renderer.resolution = (width * 100, (height + 2) * 100 + 200)
 
     # Initialize canvas for animation
     canvas = new_canvas(renderer)
     canvas = anim_initialize!(
         canvas, renderer, domain, state;
         caption = "Human: " * utterance, caption_size = 40,
-        trail_length = 10
+        trail_length = 12
     )
     canvas.blocks[2].titlesize = 30
     canvas.blocks[3].titlesize = 30
@@ -109,7 +199,7 @@ for plan_index in plan_ids
         goal_colors = gem_colors,
         ts_linewidth = 4, ts_fontsize = 30,
         marker = :circle, markersize = 24, strokewidth = 1.0,
-        linewidth = 4, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
+        linewidth = 10, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
         ax_args = (xlabelsize = 36, xticklabelsize = 24,
                 ylabelsize = 36, yticklabelsize = 24)
     )
@@ -125,7 +215,8 @@ for plan_index in plan_ids
 
     axis = content(storyboard[2, :])
     for (j, (l, u)) in enumerate(zip(eachcol(lower), eachcol(upper)))
-        band!(axis, [times; length(plan) + 1], l, u, color=(gem_colors[j], 0.2))
+        bplt = band!(axis, [times; length(plan) + 1], l, u, color=(gem_colors[j], 0.2))
+        translate!(bplt, 0, 0, -1)
     end
 
     # Add legend
@@ -135,7 +226,7 @@ for plan_index in plan_ids
     # Add axis title
     axis = content(storyboard[2, :])
     axis.title = "Human Inferences (Actions & Instructions)"
-    axis.titlesize = 44
+    axis.titlesize = 60
     axis.titlefont = :regular
     axis.titlealign = :left
     axis.xlabel = ""
@@ -148,7 +239,7 @@ for plan_index in plan_ids
         goal_colors = gem_colors,
         ts_linewidth = 4, ts_fontsize = 30,
         marker = :circle, markersize = 24, strokewidth = 1.0,
-        linewidth = 4, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
+        linewidth = 10, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
         ax_args = (xlabelsize = 36, xticklabelsize = 24,
                 ylabelsize = 36, yticklabelsize = 24)
     )
@@ -156,7 +247,7 @@ for plan_index in plan_ids
     # Add axis title
     axis = content(storyboard[3, :])
     axis.title = "Model Inferences (Actions & Instructions)"
-    axis.titlesize = 44
+    axis.titlesize = 60
     axis.titlefont = :regular
     axis.titlealign = :left
     axis.xlabel = ""
@@ -172,7 +263,7 @@ for plan_index in plan_ids
         goal_colors = gem_colors,
         ts_linewidth = 4, ts_fontsize = 30,
         marker = :circle, markersize = 24, strokewidth = 1.0,
-        linewidth = 4, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
+        linewidth = 10, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
         ax_args = (xlabelsize = 36, xticklabelsize = 24,
                 ylabelsize = 36, yticklabelsize = 24)
     )
@@ -188,13 +279,14 @@ for plan_index in plan_ids
 
     axis = content(storyboard[4, :])
     for (j, (l, u)) in enumerate(zip(eachcol(lower), eachcol(upper)))
-        band!(axis, [times; length(plan) + 1], l, u, color=(gem_colors[j], 0.2))
+        bplt = band!(axis, [times; length(plan) + 1], l, u, color=(gem_colors[j], 0.2))
+        translate!(bplt, 0, 0, -1)
     end
 
     # Add axis title
     axis = content(storyboard[4, :])
     axis.title = "Human Inferences (Actions Only)"
-    axis.titlesize = 44
+    axis.titlesize = 60
     axis.titlefont = :regular
     axis.titlealign = :left
     axis.xlabel = ""
@@ -207,7 +299,7 @@ for plan_index in plan_ids
         goal_colors = gem_colors,
         ts_linewidth = 4, ts_fontsize = 30,
         marker = :circle, markersize = 24, strokewidth = 1.0,
-        linewidth = 4, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
+        linewidth = 10, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
         ax_args = (xlabelsize = 36, xticklabelsize = 24,
                 ylabelsize = 36, yticklabelsize = 24)
     )
@@ -215,7 +307,7 @@ for plan_index in plan_ids
     # Add axis title
     axis = content(storyboard[5, :])
     axis.title = "Model Inferences (Actions Only)"
-    axis.titlesize = 44
+    axis.titlesize = 60
     axis.titlefont = :regular
     axis.titlealign = :left
     axis.xlabel = "Time"
@@ -225,8 +317,8 @@ for plan_index in plan_ids
     resize!(storyboard, (width, height))
 
     # Add figure title
-    figtitle = Label(storyboard[0, :], "Problem $problem_id: Goal $goal_id")
-    figtitle.fontsize = 60
+    figtitle = Label(storyboard[0, :], "Environment $problem_id: Goal $goal_id")
+    figtitle.fontsize = 72
     figtitle.font = :bold
     figtitle.halign = :left
 
@@ -235,9 +327,10 @@ for plan_index in plan_ids
     path = joinpath(@__DIR__, "figures", "storyboard_p$(problem_id)_g$(goal_id)")
     save(path * ".png", storyboard)
     save(path * ".pdf", storyboard)
+    sleep(2.0)
 end
 
-# Select featured stimuli for plotting
+## Select featured stimuli for plotting
 
 problem_id = 1
 goal_id = 3
@@ -270,7 +363,7 @@ canvas = new_canvas(renderer)
 canvas = anim_initialize!(
     canvas, renderer, domain, state;
     caption = "Human: " * utterance, caption_size = 38, caption_font = :bold_italic,
-    trail_length = 10
+    trail_length = 12
 )
 canvas.blocks[2].titlesize = 30
 canvas.blocks[3].titlesize = 30
@@ -311,8 +404,8 @@ storyboard_goal_lines!(
     goal_names = ["Red Gem", "Yellow Gem", "Blue Gem", "Green Gem"],
     goal_colors = gem_colors,
     ts_linewidth = 4, ts_fontsize = 36,
-    linewidth = 4, linestyle = [:dash, :solid, :dashdot, :dashdotdot],
-    marker = :circle, markersize = 24, strokewidth = 1.0,
+    linewidth = 10, linestyle = [:dash, :solid, :dashdot, :dashdotdot],
+    marker = :circle, markersize = 30, strokewidth = 2.0,
     ax_args = (xlabelsize = 40, xticklabelsize = 24,
                ylabelsize = 40, yticklabelsize = 24)
 )
@@ -328,7 +421,8 @@ lower = max.(goal_probs .- goal_probs_ci, 0.0)
 
 axis = content(storyboard[2, :])
 for (j, (l, u)) in enumerate(zip(eachcol(lower), eachcol(upper)))
-    band!(axis, [times; length(plan) + 1], l, u, color=(gem_colors[j], 0.2))
+    bplt = band!(axis, [times; length(plan) + 1], l, u, color=(gem_colors[j], 0.2))
+    translate!(bplt, 0, 0, -1)
 end
 
 # Add legend
@@ -338,7 +432,7 @@ legend = axislegend("Goals", framevisible=false, position=:rc,
 # Add axis title
 axis = content(storyboard[2, :])
 axis.title = "Human Inferences (Actions & Instructions)"
-axis.titlesize = 60
+axis.titlesize = 72
 axis.titlefont = :regular
 axis.titlealign = :left
 axis.xlabel = ""
@@ -350,8 +444,8 @@ storyboard_goal_lines!(
     goal_names = ["Red Gem", "Yellow Gem", "Blue Gem", "Green Gem"],
     goal_colors = gem_colors,
     ts_linewidth = 4, ts_fontsize = 36,
-    linewidth = 4, linestyle = [:dash, :solid, :dashdot, :dashdotdot],
-    marker = :circle, markersize = 24, strokewidth = 1.0,
+    linewidth = 10, linestyle = [:dash, :solid, :dashdot, :dashdotdot],
+    marker = :circle, markersize = 30, strokewidth = 2.0,
     ax_args = (xlabelsize = 40, xticklabelsize = 24,
                ylabelsize = 40, yticklabelsize = 24)
 )
@@ -359,7 +453,7 @@ storyboard_goal_lines!(
 # Add axis title
 axis = content(storyboard[3, :])
 axis.title = "Model Inferences (Actions & Instructions)"
-axis.titlesize = 60
+axis.titlesize = 72
 axis.titlefont = :regular
 axis.titlealign = :left
 axis.xlabel = ""
@@ -374,8 +468,8 @@ storyboard_goal_lines!(
     goal_names = ["Red Gem", "Yellow Gem", "Blue Gem", "Green Gem"],
     goal_colors = gem_colors,
     ts_linewidth = 4, ts_fontsize = 36,
-    linewidth = 4, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
-    marker = :circle, markersize = 24, strokewidth = 1.0,
+    linewidth = 10, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
+    marker = :circle, markersize = 30, strokewidth = 2.0,
     ax_args = (xlabelsize = 40, xticklabelsize = 24,
                ylabelsize = 40, yticklabelsize = 24)
 )
@@ -391,13 +485,14 @@ lower = max.(goal_probs .- goal_probs_ci, 0.0)
 
 axis = content(storyboard[4, :])
 for (j, (l, u)) in enumerate(zip(eachcol(lower), eachcol(upper)))
-    band!(axis, [times; length(plan) + 1], l, u, color=(gem_colors[j], 0.2))
+    bplt = band!(axis, [times; length(plan) + 1], l, u, color=(gem_colors[j], 0.2))
+    translate!(bplt, 0, 0, -1)
 end
 
 # Add axis title
 axis = content(storyboard[4, :])
 axis.title = "Human Inferences (Actions Only)"
-axis.titlesize = 60
+axis.titlesize = 72
 axis.titlefont = :regular
 axis.titlealign = :left
 axis.xlabel = ""
@@ -409,8 +504,8 @@ storyboard_goal_lines!(
     goal_names = ["Red Gem", "Yellow Gem", "Blue Gem", "Green Gem"],
     goal_colors = gem_colors,
     ts_linewidth = 4, ts_fontsize = 36,
-    linewidth = 4, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
-    marker = :circle, markersize = 24, strokewidth = 1.0,
+    linewidth = 10, linestyle = [:dash, :solid, :dashdot, :dashdotdot], 
+    marker = :circle, markersize = 30, strokewidth = 2.0,
     ax_args = (xlabelsize = 40, xticklabelsize = 24,
                ylabelsize = 40, yticklabelsize = 24)
 )
@@ -418,7 +513,7 @@ storyboard_goal_lines!(
 # Add axis title
 axis = content(storyboard[5, :])
 axis.title = "Model Inferences (Actions Only)"
-axis.titlesize = 60
+axis.titlesize = 72
 axis.titlefont = :regular
 axis.titlealign = :left
 axis.xlabel = "Time"
@@ -431,7 +526,7 @@ figtitle = Label(
     storyboard[0, :],
     "Bayesian Multi-Agent Goal Inference from Actions and Instructions"
 )
-figtitle.fontsize = 72
+figtitle.fontsize = 84
 figtitle.font = :bold
 figtitle.halign = :left
 figtitle.text = "Bayesian Multi-Agent Goal Inference from Actions and Instructions"
