@@ -148,7 +148,7 @@ callback = DKGCombinedCallback(
 # Configure SIPS particle filter
 sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
          
-ENV["OPENAI_API_KEY"] = "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"
+ENV["OPENAI_API_KEY"] = "..."
 # Run particle filter to perform online goal inference
 n_samples = 4
 pf_state = sips(
