@@ -16,7 +16,7 @@ include("utterance_model.jl")
 PDDL.Arrays.register!()
 
 # Set problem to load
-problem_id = 4
+problem_id = 5
 
 # Load domain and problem
 domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
@@ -88,7 +88,7 @@ agent_config = AgentConfig(
     ),
     # Joint action-utterance model
     act_config = CommunicativeActConfig(
-        BoltzmannActConfig(2.5), # Assume some Boltzmann action noise
+        BoltzmannActConfig(1.0), # Assume some Boltzmann action noise
         utterance_model, # Utterance model defined in utterance_model.jl
         (domain, planner) # Domain and planner are arguments to utterance model
     ),
@@ -107,7 +107,7 @@ world_config = WorldConfig(
 plans, utterances, splitpoints = load_plan_dataset(joinpath(@__DIR__, "plans"))
 
 # Construct choicemap of observed actions to perform inference
-goal_id = 4
+goal_id = 3
 index = "p$(problem_id)_g$(goal_id)"
 plan = plans[index]
 observations = act_choicemap_vec(plan)
@@ -123,6 +123,9 @@ for t in 2:length(observations)
     observations[t][:timestep => t => :act => :sample_utterance] = false
 end
 
+# Construct captions for visualization
+captions = Dict(1 => utterances[index], splitpoints[index][2] => "...")
+
 # Construct callback for logging data and visualizing inference
 callback = DKGCombinedCallback(
     renderer, domain;
@@ -131,9 +134,10 @@ callback = DKGCombinedCallback(
     goal_colors = goal_colors,
     obs_trajectory = PDDL.simulate(domain, state, plan),
     print_goal_probs = true,
-    plot_goal_bars = false,
-    plot_goal_lines = false,
+    plot_goal_bars = true,
+    plot_goal_lines = true,
     render = true,
+    captions = captions,
     inference_overlay = true,
     record = true
 )

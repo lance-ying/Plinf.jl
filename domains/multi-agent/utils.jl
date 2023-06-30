@@ -145,6 +145,7 @@ logs data and visualizes inference for the doors, keys and gems domain.
 - `obs_trajectory = nothing`: Ground truth / observed trajectory.
 - `print_goal_probs = true`: Whether to print goal probabilities.
 - `render = true`: Whether to render the gridworld.
+- `captions = Dict{Int, String}()`: Captions to render at specified times.
 - `inference_overlay = true`: Whether to render inference overlay.
 - `plot_goal_bars = false`: Whether to plot goal probabilities as a bar chart.
 - `plot_goal_lines = false`: Whether to plot goal probabilities over time.
@@ -161,13 +162,14 @@ function DKGCombinedCallback(
     obs_trajectory = nothing,
     print_goal_probs::Bool = true,
     render::Bool = true,
+    captions = Dict{Int,String}(),
     inference_overlay = true,
     plot_goal_bars::Bool = false,
     plot_goal_lines::Bool = false,
     record::Bool = false,
     sleep::Real = 0.2,
     framerate = 5,
-    format = "mp4"
+    format = "mp4",
 )
     callbacks = OrderedDict{Symbol, SIPSCallback}()
     n_goals = length(goal_names)
@@ -197,7 +199,8 @@ function DKGCombinedCallback(
         callbacks[:render] = RenderCallback(
             renderer, figure[1, 1], domain;
             trajectory=obs_trajectory, trail_length=10,
-            overlay = inference_overlay ? overlay : nothing
+            overlay = inference_overlay ? overlay : nothing,
+            captions = captions
         )
     end
     # Construct plotting callbacks
@@ -289,6 +292,9 @@ function (overlay::DKGInferenceOverlay)(
             future_actions = rollout_sol(domain, planner, state, sol, spec;
                                          max_steps=overlay.max_future_steps)
             future_states = PDDL.simulate(domain, state, future_actions)
+            if length(future_states) > 1
+                future_states = future_states[2:end]
+            end
             # Render or update future states
             color = overlay.trace_color_fn(tr)
             future_obs = get(overlay.future_obs, i, nothing)
