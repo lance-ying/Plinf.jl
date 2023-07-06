@@ -24,14 +24,18 @@ action_dict = Dict(
 "6.1"=>@pddl("(left human)",  "(left human)"),
 "6.2"=>@pddl("(left human)",  "(left human)"),
 "7.1"=>@pddl("(right human)",  "(right human)","(right human)"),
-"7.2"=>@pddl("(right human)",  "(right human)", "(right human)", "(right human)",  "(right human)", "(right human)", "(right human)", "(pickuph human key2)"),
+"7.2"=>@pddl("(right human)",  "(right human)", "(right human)", "(right human)",  "(right human)", "(right human)", "(right human)", "(pickup human key2)"),
 "7.3"=>@pddl("(right human)",  "(right human)","(right human)","(right human)"),
 "8.1"=>@pddl("(noop human)"),
 "8.2"=>@pddl("(noop human)"),
 "9.1"=>@pddl("(right human)", "(right human)", "(right human)","(down human)"),
-"10.1"=>@pddl("(left human)", "(left human)", "(left human)","(left human)","(left human)","(pickuph human key1)"),
-"10.2"=>@pddl("(right human)", "(right human)",  "(right human)","(right human)","(right human)","(pickuph human key2)"),
-"11.1"=>@pddl("(up human)", "(up human)", "(up human)","(up human)")
+"10.1"=>@pddl("(left human)", "(left human)", "(left human)","(left human)","(left human)","(pickup human key1)"),
+"10.2"=>@pddl("(right human)", "(right human)",  "(right human)","(right human)","(right human)","(pickup human key2)"),
+"11.1"=>@pddl("(up human)", "(up human)", "(up human)","(up human)"),
+"12.1"=>@pddl("(up human)",  "(up human)",  "(right human)", "(right human)"),
+"12.2"=>@pddl("(up human)",  "(up human)", "(left human)", "(left human)"),
+"13.1"=>@pddl("(down human)", "(down human)", "(pickup human key3)", "(up human)",  "(right human)"),
+"13.2"=>@pddl("(down human)", "(left human)", "(left human)", "(left human)","(left human)", "(pickup human key2)", "(right human)", "(right human)")
 
 )
 #--- Initial Setup ---#

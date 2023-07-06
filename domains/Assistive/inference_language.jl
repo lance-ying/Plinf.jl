@@ -26,17 +26,17 @@ problem = load_problem(joinpath(@__DIR__, "$problem_id.pddl"))
 state = initstate(domain, problem)
 
 # Define action costs
-costs = (
-    pickuph=1.0, pickupr=1.0, handover=1.0, unlockh=1.0, unlockr=10.0, 
-    up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-)
+# costs = (
+#     pickuph=1.0, pickupr=1.0, handover=1.0, unlockh=1.0, unlockr=10.0, 
+#     up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+# )
 
 # Construct goal specification
-spec = MinActionCosts(Term[problem.goal], costs)
+spec = Specification(Term[problem.goal])
 
 # Compile and cache domain for faster performance
-domain, state = PDDL.compiled(domain, state)
-domain = CachedDomain(domain)
+# domain, state = PDDL.compiled(domain, state)
+# domain = CachedDomain(domain)
 
 # Visualize initial state
 canvas = renderer(domain, state)
@@ -44,8 +44,8 @@ canvas = renderer(domain, state)
 #--- Visualize Plans ---#
 
 # Check that A* heuristic search correctly solves the problem
-astar = AStarPlanner(GoalManhattan(), save_search=true)
-sol = astar(domain, state, spec)
+# astar = AStarPlanner(GoalManhattan(), save_search=true)
+# sol = astar(domain, state, spec)
 
 # Visualize solution 
 plan = collect(sol)
@@ -148,7 +148,7 @@ callback = DKGCombinedCallback(
 # Configure SIPS particle filter
 sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
          
-ENV["OPENAI_API_KEY"] = "..."
+ENV["OPENAI_API_KEY"] = "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"
 # Run particle filter to perform online goal inference
 n_samples = 4
 pf_state = sips(
