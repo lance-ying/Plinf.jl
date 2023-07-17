@@ -45,6 +45,8 @@ function rollout_sol(
         search_sol = planner.planner(domain, state, spec)
         planner.heuristic = heuristic
         return collect(search_sol)
+    elseif sol isa NullSolution # If no solution, return empty vector
+        return Vector{Compound}()
     else # Otherwise just rollout the policy greedily
         actions = Vector{Compound}()
         for _ in 1:max_steps
@@ -117,7 +119,7 @@ function RelaxedMazeDist()
 end
 
 function RelaxedMazeDist(planner::Planner)
-    heuristic = PlannerHeuristic(planner, s_transform=relax_state)
+    heuristic = PlannerHeuristic(planner, s_transform=unlock_doors)
     heuristic = memoized(heuristic)
     return heuristic
 end
