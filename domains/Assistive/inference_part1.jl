@@ -53,24 +53,30 @@ problem = load_problem(joinpath(@__DIR__, "$problem_id.pddl"))
 # Initialize state
 state = initstate(domain, problem)
 
+# Define action costs
+costs = (
+    pickup=1.0, handover=1.0, unlock=1.0, 
+    up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+)
 
 # Construct goal specification
 spec = Specification(Term[problem.goal])
-
 
 # Visualize initial state
 canvas = renderer(domain, state)
 
 #--- Visualize Plans ---#
 
+# Define custom relaxed distance heuristic
+heuristic = RelaxedMazeDist(GoalManhattan([pddl"(human)"]))
+hval = heuristic(domain, state, pddl"(has human gem1)")
+
 # Check that A* heuristic search correctly solves the problem
-# astar = AStarPlanner(GoalManhattan(), save_search=true)
-# sol = astar(domain, state, spec)
+astar = AStarPlanner(h, save_search=true, max_nodes=20)
+sol = astar(domain, state, pddl"(has human gem1)")
 
-# # Visualize solution 
-# plan = collect(sol)
-
-# anim = anim_plan(renderer, domain, state, plan)
+# Visualize solution 
+renderer(domain, state, sol)
 
 #--- Goal Inference Setup ---#
 
@@ -91,42 +97,38 @@ end
 goal_addr = :init => :agent => :goal => :goal
 goal_strata = choiceproduct((goal_addr, 1:length(goals)))
 
-# Use RTHS planner that updates value estimates of all neighboring states
-# at each timestep, using full-horizon heuristic search to estimate the value
+# Compile domain for faster inference
+domain, state = compiled(domain, state)
 
-planner = AStarPlanner(heuristic, search_noise=0.1,max_nodes=2) 
-# heuristic = GoalManhattan()
-# planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^32) 
+# Construct RTDP planner that does no actual planning
+# Value function is initialized to a "no-doors" relaxed distance heuristic
+heuristic = RelaxedMazeDist(GoalManhattan([pddl"(human)"]))
+planner = RTDP(heuristic=heuristic, n_rollouts=0) 
+
+# Define Boltzmann agent model using relaxed planner
 agent_config = AgentConfig(
     domain, planner;
     # Assume fixed goal over time
     goal_config = StaticGoalConfig(goal_prior),
-    # Assume the agent randomly replans over time
-    replan_args = (
-        prob_replan = 0.1, # Probability of replanning at each timestep
-        budget_dist = shifted_neg_binom, # Search budget distribution
-        budget_dist_args = (2, 0.05, 1) # Budget distribution parameters
-    ),
     # Assume a small amount of action noise
-    act_epsilon = 0.05,
+    act_temperature = 1.0,
 )
 
 # Define observation noise model
-obs_params = ObsNoiseParams(
-    (pddl"(xloc human)", normal, 1.0),
-    (pddl"(yloc human)", normal, 1.0),
-    (pddl"(forall (?d - door) (locked ?d))", 0.05),
-    (pddl"(forall (?i - item) (has ?i))", 0.05),
-    (pddl"(forall (?i - item) (offgrid ?i))", 0.05)
-)
-obs_params = ground_obs_params(obs_params, domain, state)
-obs_terms = collect(keys(obs_params))
+# obs_params = ObsNoiseParams(
+#     (pddl"(xloc human)", normal, 1.0),
+#     (pddl"(yloc human)", normal, 1.0),
+#     (pddl"(forall (?d - door) (locked ?d))", 0.05),
+#     (pddl"(forall (?i - item) (has ?i))", 0.05),
+#     (pddl"(forall (?i - item) (offgrid ?i))", 0.05)
+# )
+# obs_params = ground_obs_params(obs_params, domain, state)
+# obs_terms = collect(keys(obs_params))
 
 # Configure world model with planner, goal prior, initial state, and obs params
 world_config = WorldConfig(
     agent_config = agent_config,
     env_config = PDDLEnvConfig(domain, state),
-    obs_config = MarkovObsConfig(domain, obs_params)
 )
 
 #--- Test Trajectory Generation ---#
@@ -137,18 +139,19 @@ obs_traj = PDDL.simulate(domain, state, action_dict["3.1"])
 # Visualize trajectory
 # anim = anim_trajectory(renderer, domain, obs_traj;
                     #    framerate=5, format="gif", trail_length=10)
-storyboard = render_storyboard(
-    anim, [4, 9, 17, 21];
-    subtitles = ["(i) Initially ambiguous goal",
-                 "(ii) Red eliminated upon key pickup",
-                 "(iii) Yellow most likely upon unlock",
-                 "(iv) Switch to blue upon backtracking"],
-    xlabels = ["t = 4", "t = 9", "t = 17", "t = 21"],
-    xlabelsize = 20, subtitlesize = 24
-)
+# storyboard = render_storyboard(
+#     anim, [4, 9, 17, 21];
+#     subtitles = ["(i) Initially ambiguous goal",
+#                  "(ii) Red eliminated upon key pickup",
+#                  "(iii) Yellow most likely upon unlock",
+#                  "(iv) Switch to blue upon backtracking"],
+#     xlabels = ["t = 4", "t = 9", "t = 17", "t = 21"],
+#     xlabelsize = 20, subtitlesize = 24
+# )
 
 # Construct iterator over observation timesteps and choicemaps 
-t_obs_iter = state_choicemap_pairs(obs_traj, obs_terms; batch_size=1)
+# t_obs_iter = state_choicemap_pairs(obs_traj, obs_terms; batch_size=1)
+t_obs_iter = act_choicemap_pairs(action_dict["3.1"])
 
 #--- Online Goal Inference ---#
 
@@ -160,7 +163,7 @@ callback = DKGCombinedCallback(
     goal_colors = goal_colors,
     obs_trajectory = obs_traj,
     print_goal_probs = true,
-    plot_goal_bars = false,
+    plot_goal_bars = true,
     plot_goal_lines = true,
     render = true,
     inference_overlay = true,
@@ -168,11 +171,10 @@ callback = DKGCombinedCallback(
 )
 
 # Configure SIPS particle filter
-sips = SIPS(world_config, resample_cond=:ess, rejuv_cond=:periodic,
-            rejuv_kernel=ReplanKernel(2), period=2)
+sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
 
 # Run particle filter to perform online goal inference
-n_samples = 80
+n_samples = 4
 pf_state = sips(
     n_samples, t_obs_iter;
     init_args=(init_strata=goal_strata,),
