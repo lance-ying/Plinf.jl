@@ -68,17 +68,20 @@ collecting all goal objects by computing the distance between all goal objects
 and the agent, then returning the minimum distance plus the number of remaining
 goals to satisfy.
 """
-struct GoalManhattan <: Heuristic end
+struct GoalManhattan <: Heuristic
+    agents::Vector{Const}
+end
+
+GoalManhattan() = GoalManhattan([pddl"(human)", pddl"(robot)"])
+GoalManhattan(domain::Domain, state::State) =
+    GoalManhattan(PDDL.get_objects(domain, state, :agent))
 
 function compute(heuristic::GoalManhattan,
                  domain::Domain, state::State, spec::Specification)
   goals = get_goal_terms(spec)
   has_goals = [g for g in goals if g.name == :has]
-  n_agents = length(PDDL.get_objects(state, :human)) +
-             length(PDDL.get_objects(state, :robot))
+  n_agents = length(heuristic.agents)
   noop_cost = spec isa MinActionCosts ? spec.costs[:noop] : 1
-  all_agents = (PDDL.get_objects(state, :human)...,
-                PDDL.get_objects(state, :robot)...)
   dists = map(has_goals) do goal
       if state[goal] return 0 end
       agent, item = goal.args
@@ -86,7 +89,7 @@ function compute(heuristic::GoalManhattan,
       agent_loc = get_obj_loc(state, agent)
       agent_item_dist = sum(abs.(agent_loc .- item_loc))
       min_other_dist = Inf
-      for other in all_agents
+      for other in heuristic.agents
           other == agent && continue
           other_loc = get_obj_loc(state, other)
           other_dist = agent_item_dist
@@ -115,6 +118,11 @@ A `planner` can specified to compute the relaxed plan. By default this is
 """
 function RelaxedMazeDist()
     planner = AStarPlanner(GoalManhattan())
+    return RelaxedMazeDist(planner)
+end
+
+function RelaxedMazeDist(heuristic::Heuristic)
+    planner = AStarPlanner(heuristic)
     return RelaxedMazeDist(planner)
 end
 
