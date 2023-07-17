@@ -1,10 +1,23 @@
 (define (domain doors-keys-gems)
     (:requirements :fluents :adl :typing)
-    (:types key gem chest - item robot human - agent color door  - object)
-    (:predicates (has ?a - human ?i - item)(iscolor ?d - door ?c - color) (iscolor ?k - key ?c - color) (offgrid ?i - item) (locked ?d - door))
-    (:functions (xloc ?a - human) (yloc ?a - human) - integer
-                (xloc ?o - object) (yloc ?o - object) - integer
-                (walls) - bit-matrix)
+    (:types
+        key gem - item
+        robot human - agent
+        item door agent - physical
+        physical color - object
+    )
+    (:predicates
+        (has ?a - agent ?i - item) 
+        (iscolor ?o - physical ?c - color)
+        (offgrid ?i - item)
+        (locked ?d - door)
+    )
+    (:functions
+        (xloc ?o - physical) (yloc ?o - physical) - integer
+        (agentcode ?a - agent) - integer
+        (turn)- integer
+        (walls)- bit-matrix
+    )
     (:action pickup
      :parameters (?a - human ?i - item)
      :precondition (and (not (has ?a ?i)) (= (xloc ?a) (xloc ?i)) (= (yloc ?a) (yloc ?i)))

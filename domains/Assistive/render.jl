@@ -33,7 +33,6 @@ renderer = PDDLViz.GridworldRenderer(
         #     color=colordict[get_obj_color(s, o).name]
         # ),
         :key => (d, s, o) -> MultiGraphic(KeyGraphic(-0.1,-0.1,
-            visible=!s[Compound(:has, [o])],
             # color=get_obj_color(s, o).name
             color=colordict[get_obj_color(s, o).name]
         ),
