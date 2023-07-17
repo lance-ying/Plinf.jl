@@ -134,7 +134,8 @@ world_config = WorldConfig(
 #--- Test Trajectory Generation ---#
 
 # Construct a trajectory with backtracking to perform inference on
-obs_traj = PDDL.simulate(domain, state, action_dict["3.1"])
+obs_plan = action_dict["$problem_id.1"]
+obs_traj = PDDL.simulate(domain, state, obs_plan)
 
 # Visualize trajectory
 # anim = anim_trajectory(renderer, domain, obs_traj;
@@ -151,7 +152,7 @@ obs_traj = PDDL.simulate(domain, state, action_dict["3.1"])
 
 # Construct iterator over observation timesteps and choicemaps 
 # t_obs_iter = state_choicemap_pairs(obs_traj, obs_terms; batch_size=1)
-t_obs_iter = act_choicemap_pairs(action_dict["3.1"])
+t_obs_iter = act_choicemap_pairs(obs_plan)
 
 #--- Online Goal Inference ---#
 
