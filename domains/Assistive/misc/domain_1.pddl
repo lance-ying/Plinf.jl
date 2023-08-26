@@ -1,43 +1,42 @@
 (define (domain doors-keys-gems)
     (:requirements :fluents :adl :typing)
-    (:types
-        key gem - item
-        robot human - agent
-        item door agent - physical
-        physical color - object
-    )
-    (:predicates
-        (has ?a - agent ?i - item) 
-        (iscolor ?o - physical ?c - color)
-        (offgrid ?i - item)
-        (locked ?d - door)
-    )
-    (:functions
-        (xloc ?o - physical) (yloc ?o - physical) - integer
-        (agentcode ?a - agent) - integer
-        (turn)- integer
-        (walls)- bit-matrix
-    )
+    (:types key gem chest door - item robot human - agent color  - object)
+    (:predicates (has ?a - agent ?i - item)(iscolor ?i - item ?c - color) (offgrid ?i - item) (locked ?d - door) )
+    (:functions (xloc ?a - agent) (yloc ?a - agent) - integer
+                (xloc ?o - object) (yloc ?o - object) - integer
+                
+                (key_count ?c ?a - agent) (blue_key_count ?a - agent) (yellow_key_count ?a - agent) (total_key_count ?a - agent)- integer
+                (red_door_count ?a - agent) (blue_door_count ?a - agent) (yellow_door_count ?a - agent) (total_door_count ?a - agent)- integer
+                (walls) - bit-matrix)
     (:action pickup
-     :parameters (?a - human ?i - item)
+     :parameters (?a - agent ?i - item)
      :precondition (and (not (has ?a ?i)) (= (xloc ?a) (xloc ?i)) (= (yloc ?a) (yloc ?i)))
      :effect (and (has ?a ?i) (offgrid ?i)
-                  (assign (xloc ?i) -1) (assign (yloc ?i) -1))
-    )
+                  (assign (xloc ?i) -1) (assign (yloc ?i) -1) 
+                ;   (increase (red_key_count ?a) 1)
+                  (when (iscolor ?i red)(increase (red_key_count ?a) 1))
+                  (when (iscolor ?i blue)(increase (blue_key_count ?a) 1))
+                  (when (iscolor ?i yellow)(increase (yellow_key_count ?a) 1))
+    ))
 
     (:action unlock
-     :parameters (?a - human ?k - key ?d - door)
+     :parameters (?a - agent ?k - key ?d - door)
      :precondition (and (has ?a ?k) (locked ?d)
                         (exists (?c - color) (and (iscolor ?k ?c) (iscolor ?d ?c)))
                         (or (and (= (xloc ?a) (xloc ?d)) (= (- (yloc ?a) 1) (yloc ?d)))
                             (and (= (xloc ?a) (xloc ?d)) (= (+ (yloc ?a) 1) (yloc ?d)))
                             (and (= (- (xloc ?a) 1) (xloc ?d)) (= (yloc ?a) (yloc ?d)))
                             (and (= (+ (xloc ?a) 1) (xloc ?d)) (= (yloc ?a) (yloc ?d)))))
-     :effect (and (not (has ?a ?k)) (not (locked ?d)))
+     :effect (and (not (has ?a ?k)) (not (locked ?d))
+                       (when (iscolor ?d red)(increase (red_door_count ?a) 1))
+                  (when (iscolor ?d blue)(increase (blue_door_count ?a) 1))
+                  (when (iscolor ?d yellow)(increase (yellow_door_count ?a) 1))
+                  )
     )
 
+
     (:action up
-     :parameters (?a - human)
+     :parameters (?a - agent)
      :precondition
         (and (> (yloc ?a) 1)
             (= (get-index walls (- (yloc ?a) 1) (xloc ?a)) false)
@@ -47,7 +46,7 @@
     )
 
     (:action down
-     :parameters (?a - human)
+     :parameters (?a - agent)
      :precondition
         (and (< (yloc ?a) (height walls))
             (= (get-index walls (+ (yloc ?a) 1) (xloc ?a)) false)
@@ -57,7 +56,7 @@
     )
 
     (:action left
-     :parameters (?a - human)
+     :parameters (?a - agent)
      :precondition
         (and (> (xloc ?a) 1)
             (= (get-index walls (yloc ?a) (- (xloc ?a) 1)) false)
@@ -67,7 +66,7 @@
     )
 
     (:action right
-     :parameters (?a - human)
+     :parameters (?a - agent)
      :precondition
         (and (< (xloc ?a) (width walls)) 
             (= (get-index walls (yloc ?a) (+ (xloc ?a) 1)) false)

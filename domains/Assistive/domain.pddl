@@ -11,6 +11,7 @@
         (iscolor ?o - physical ?c - color)
         (offgrid ?i - item)
         (locked ?d - door)
+        (robot_unlock ?d - door)
     )
     (:functions
         (xloc ?o - physical) (yloc ?o - physical) - integer
@@ -52,7 +53,7 @@
                             (and (= (xloc ?a) (xloc ?d)) (= (+ (yloc ?a) 1) (yloc ?d)))
                             (and (= (- (xloc ?a) 1) (xloc ?d)) (= (yloc ?a) (yloc ?d)))
                             (and (= (+ (xloc ?a) 1) (xloc ?d)) (= (yloc ?a) (yloc ?d)))))
-     :effect (and (not (has ?a ?k)) (not (locked ?d)) (assign turn (- 1  turn)))
+     :effect (and (not (has ?a ?k)) (not (locked ?d)) (robot_unlock ?d) (assign turn (- 1  turn)))
     )
     ; (:action unlock
     ;  :parameters (?a - agent ?k - key ?d - door)

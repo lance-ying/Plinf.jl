@@ -1,12 +1,11 @@
-; Can you pass me the red key?
+;Can you pass me the red keys?
 (up human)
 (noop robot)
 (up human)
 (noop robot)
 (up human)
 (noop robot)
-(left human)
+(up human)
 (noop robot)
-(left human)
+(up human)
 (noop robot)
-
