@@ -196,3 +196,7 @@ function generate_goal()
     return goalset
 end
 
+
+for pid in sort(collect(keys(action_dict)))
+    println(pid, " length ",length(action_dict[pid]))
+end

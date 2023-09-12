@@ -97,7 +97,7 @@ renderer = PDDLViz.GridworldRenderer(
         (d, s, o) -> s[Compound(:has, [Const(:robot), o])]
     ],
     inventory_types = [:item, :item],
-    inventory_labels = ["Human", "Robot"],
+    inventory_labels = ["Human Inventory", "Robot Inventory"],
     trajectory_options = Dict(
         :tracked_objects => [Const(:human), Const(:robot)],
         :tracked_types => Const[],

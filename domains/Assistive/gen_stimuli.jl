@@ -16,14 +16,14 @@ PDDL.Arrays.register!()
 # problem 1
 path = joinpath(dirname(pathof(Plinf)), "..", "domains", "Assistive")
 domain = load_domain(joinpath(path, "domain.pddl"))
-
+astar = AStarPlanner(GoalManhattan(), save_search=true)
 # costs = (
 #     pickuph=10.0,pickup=1.0, pickupr=1.0, handover=1.0, unlockh=1.0,unlockr=10.0, 
 #     up=1.0, down=1.0, left=1.0, right=1.0, noop=0.2
 # )
 
 costs = (
-    pickuph=3.0, pickupr=1.0, handover=1.0, unlockh=1.0, unlockr=5.0, 
+    pickuph=2.0, pickupr=1.0, handover=1.0, unlockh=1.0, unlockr=2.0, 
     up=1.0, down=1.0, left=1.0, right=1.0, noop=0.1
 )
 
@@ -33,7 +33,55 @@ costs_d = (
 )
 
 function run_demo(complete = false)
-    problem = load_problem(joinpath(path, "demo.pddl"))
+
+    problem = load_problem(joinpath(path, "demo0.pddl"))
+    state = initstate(domain, problem)
+    plan = @pddl("(right human)",  "(noop robot)", "(right human)",  "(noop robot)")
+    traj = PDDL.simulate(domain, state, plan)
+
+    if complete
+        astar = AStarPlanner(GoalManhattan(), save_search=true)
+        sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
+        captions = Dict(
+            1 => "...\n...",
+            )
+        anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
+        save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/demo_0_complete.gif", anim, framerate=4, loop=-1)
+        
+    else
+        captions = Dict(
+            1 => "...\n...",
+            4 => "Human: \"Can you pass me a red key?\""
+            )
+        anim = anim_trajectory(renderer, domain, traj, format="gif", captions=captions,caption_size=28, framerate=3)
+        save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/demo_0.gif", anim, framerate=3, loop=-1)  
+    end
+
+
+    problem = load_problem(joinpath(path, "demo1.pddl"))
+    state = initstate(domain, problem)
+    plan = @pddl("(right human)",  "(noop robot)", "(right human)",  "(noop robot)")
+    traj = PDDL.simulate(domain, state, plan)
+
+    if complete
+        astar = AStarPlanner(GoalManhattan(), save_search=true)
+        sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
+        captions = Dict(
+            1 => "...",
+            )
+        anim = anim_plan(renderer_d, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
+        save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/demo_1_complete.gif", anim, framerate=4, loop=-1)
+    else
+        captions = Dict(
+            1 => "...",
+            4 => "Human: \"Can you unlock the red door?\""
+            )
+        anim = anim_trajectory(renderer_d, domain, traj, format="gif", captions=captions,caption_size=28, framerate=3)
+        save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/demo_1.gif", anim, framerate=3, loop=-1)  
+    end
+
+    
+    problem = load_problem(joinpath(path, "demo2.pddl"))
     state = initstate(domain, problem)
     plan = @pddl("(down human)",  "(noop robot)", "(right human)",  "(noop robot)")
     traj = PDDL.simulate(domain, state, plan)
@@ -41,7 +89,10 @@ function run_demo(complete = false)
     if complete
         astar = AStarPlanner(GoalManhattan(), save_search=true)
         sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-        anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+        captions = Dict(
+            1 => "...\n...",
+            )
+        anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
         save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/demo_2_complete.gif", anim, framerate=4, loop=-1)
         
     else
@@ -53,50 +104,31 @@ function run_demo(complete = false)
         save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/demo_2.gif", anim, framerate=3, loop=-1)  
     end
 
-    problem = load_problem(joinpath(path, "demo1.pddl"))
+end
+
+    complete = false
+    problem = load_problem(joinpath(path, "demo0.pddl"))
     state = initstate(domain, problem)
-    plan = @pddl("(right human)",  "(noop robot)", "(right human)",  "(noop robot)", "(right human)",  "(noop robot)")
+    plan = @pddl("(right human)",  "(noop robot)", "(right human)",  "(noop robot)")
     traj = PDDL.simulate(domain, state, plan)
 
     if complete
         astar = AStarPlanner(GoalManhattan(), save_search=true)
         sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-        anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
-        save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/demo_1_complete.gif", anim, framerate=4, loop=-1)
+        captions = Dict(
+            1 => "...",
+            )
+        anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
+        save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/demo_0_complete.gif", anim, framerate=4, loop=-1)
+        
     else
         captions = Dict(
             1 => "...",
-            6 => "Human: \"Can you pass me a red key?\""
+            4 => "Human: \"Can you pass me a red key?\""
             )
         anim = anim_trajectory(renderer, domain, traj, format="gif", captions=captions,caption_size=28, framerate=3)
-        save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/demo_1.gif", anim, framerate=3, loop=-1)  
+        save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/demo_0.gif", anim, framerate=3, loop=-1)  
     end
-end
-
-
-function run_show(option::Integer)
-
-    problem = load_problem(joinpath(path, "show.pddl"))
-
-    state = initstate(domain, problem)
-    if option == 1
-
-        plan = @pddl("(noop human)",  "(left robot)", "(noop human)",  "(left robot)", "(noop human)",  "(left robot)","(noop human)",  "(left robot)","(noop human)", "(left robot)","(noop human)",  "(pickupr robot key1)")
-        state, traj = PDDL.simulate(domain, state, plan)
-    end
-    if option == 2
-        plan = @pddl("(noop human)",  "(right robot)", "(noop human)",  "(right robot)", "(noop human)", "(right robot)","(noop human)", "(pickupr robot key2)")
-        traj = PDDL.simulate(domain, state, plan)
-        captions = Dict(
-            1 => "Human: \"Can you go get the green gem?\"",
-            8 => "Human: \"Can you go get the green gem?\""
-            )
-        anim = anim_plan(renderer, domain, state, plan, trail_length = 15 ,captions=captions,caption_size=28, show_inventory = true, framerate=3)
-        save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/show_2.gif", anim, framerate=3, loop=-1)
-    end
-end
-
-
 
 function run_problem_1(option::Integer; complete=false)
 
@@ -109,8 +141,12 @@ function run_problem_1(option::Integer; complete=false)
 
     if complete == true
         astar = AStarPlanner(GoalManhattan(), save_search=true)
+        # captions = "som"
+        captions = Dict(
+            1 => "..."
+            )
         sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-        anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+        anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15,captions=captions,show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
         save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p1_1_complete.gif", anim, framerate=4, loop=-1)
     else
         captions = Dict(
@@ -132,6 +168,10 @@ function run_problem_2(option::Integer; complete = false)
 
     state = initstate(domain, problem)
 
+    costs = (
+    pickuph=5.0, pickupr=1.0, handover=1.0, unlockh=1.0, unlockr=2.0, 
+    up=1.0, down=1.0, left=1.0, right=1.0, noop=0.1)
+
     if option == 1
 
         plan = @pddl("(up human)",  "(noop robot)", "(up human)",  "(noop robot)", "(up human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)")
@@ -140,7 +180,10 @@ function run_problem_2(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p2_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -159,7 +202,10 @@ function run_problem_2(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p2_2_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -173,24 +219,6 @@ end
 
 end
 
-domain = load_domain(joinpath(path, "domain.pddl"))
-
-problem = load_problem(joinpath(path, "3.pddl"))
-state = initstate(domain, problem)
-
-
-domain, state = PDDL.compiled(domain, state)
-domain = CachedDomain(domain)
-
-astar = AStarPlanner(GoalManhattan(), save_search=true)
-
-plan = action_dict["3.3"]
-traj = PDDL.simulate(domain, state, plan)
-
-sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem3)", costs))
-anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
-save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p3_3_complete.gif", anim, framerate=4, loop=-1)
-
 
 function run_problem_3(option::Integer; complete = false)
     domain = load_domain(joinpath(path, "domain.pddl"))
@@ -199,17 +227,17 @@ function run_problem_3(option::Integer; complete = false)
 
     state = initstate(domain, problem)
 
-    # plt = render(state; start=start_pos, captions=captions,gem_colors=gem_colors)
-
     if option == 1
 
         plan = action_dict["3.1"]
         traj = PDDL.simulate(domain, state, plan)
 
         if complete == true
-            # traj = PDDL.simulate(domain, state, plan)
-            sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem1)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            sol = @pddl("(noop human)", "(up robot)", "(noop human)", "(right robot)", "(noop human)", "(pickupr robot key5)", "(noop human)", "(left robot)", "(noop human)", "(up robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(down robot)", "(noop human)", "(pickupr robot key4)", "(noop human)", "(up robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(handover robot human key4)", "(unlockh human key4 door3)", "(handover robot human key5)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(up human)", "(noop robot)", "(unlockh human key5 door1)", "(noop robot)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(pickuph human gem1)")
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15,captions=captions ,show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p3_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -223,16 +251,21 @@ function run_problem_3(option::Integer; complete = false)
 
     if option == 2
 
-        plan =  action_dict["3.1"]
+        plan =  action_dict["3.2"]
         traj = PDDL.simulate(domain, state, plan)
         if complete == true
-            sol = @pddl("(right robot)", "(noop human)", "(up robot)", "(noop human)","(pickupr robot key2)", "(noop human)", "(right robot)", "(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(left robot)", "(noop human)", "(pickupr robot key1)", "(noop human)", "(right robot)", "(noop human)","(down robot)", "(noop human)","(down robot)", "(noop human)","(down robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(handover robot human key1)", "(unlockh human key1 door2)", "(handover robot human key2)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(unlockh human key2 door1)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(pickuph human gem1)")
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "..."
+                )
+            sol = @pddl("(noop human)", "(up robot)", "(noop human)", "(right robot)", "(noop human)", "(pickupr robot key5)", "(noop human)", "(left robot)", "(noop human)", "(up robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(down robot)", "(noop human)", "(pickupr robot key4)", "(noop human)", "(up robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(handover robot human key4)", "(unlockh human key4 door3)", "(handover robot human key5)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(up human)", "(noop robot)", "(unlockh human key5 door1)", "(noop robot)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(pickuph human gem1)")
+
+            # sol = @pddl("(right robot)", "(noop human)", "(up robot)", "(noop human)","(pickupr robot key2)", "(noop human)", "(right robot)", "(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(left robot)", "(noop human)", "(pickupr robot key1)", "(noop human)", "(right robot)", "(noop human)","(down robot)", "(noop human)","(down robot)", "(noop human)","(down robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(handover robot human key1)", "(unlockh human key1 door2)", "(handover robot human key2)", "(up human)", "(noop robot)", "(up human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(unlockh human key2 door1)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(pickuph human gem1)")
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15,captions=captions ,show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p3_2_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
                 1 => "...",
-                10 => "Human: \"Can you pass me a red key for this door?\""
+                10 => "Human: \"Give me a red key for this door?\""
                 )
             anim = anim_plan(renderer, domain, state, plan, trail_length = 15 ,captions=captions,caption_size=28, show_inventory = true, framerate=3)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/p3_2.gif", anim, framerate=3, loop=-1)    
@@ -246,8 +279,11 @@ function run_problem_3(option::Integer; complete = false)
 
         traj = PDDL.simulate(domain, state, plan) 
         if complete == true
-            sol = @pddl("(right robot)", "(noop human)", "(up robot)", "(noop human)", "(pickupr robot key2)", "(noop human)","(down robot)", "(noop human)","(down robot)", "(noop human)", "(pickupr robot key3)", "(noop human)", "(up robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(down robot)", "(noop human)", "(handover robot human key2)", "(noop human)" , "(handover robot human key3)", "(down human)", "(noop robot)", "(unlockh human key2 door5)","(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(unlockh human key3 door4)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(pickuph human gem3)")
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "..."
+                )
+            sol = @pddl("(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(right robot)", "(noop human)", "(pickupr robot key2)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(pickupr robot key1)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(left robot)", "(noop human)", "(handover robot human key1)", "(unlockh human key1 door4)", "(handover robot human key2)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(unlockh human key2 door5)", "(noop robot)", "(down human)", "(noop robot)", "(down human)", "(noop robot)", "(pickuph human gem3)")
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,captions=captions,show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p3_3_complete.gif", anim, framerate=4, loop=-1)
         else  
             captions = Dict(
@@ -275,8 +311,11 @@ function run_problem_4(option::Integer; complete = false)
         plan = @pddl("(right human)",  "(noop robot)", "(right human)",  "(noop robot)", "(right human)", "(noop robot)","(right human)",  "(noop robot)")
         traj = PDDL.simulate(domain, state, plan)
         if complete == true
+            captions = Dict(
+                1 => "...",
+                )
             sol = @pddl("(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(left robot)", "(noop human)", "(pickupr robot key3)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(pickupr robot key4)", "(noop human)", "(left robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(down robot)", "(noop human)", "(handover robot human key3)", "(noop human)", "(handover robot human key4)", "(down human)", "(noop robot)", "(down human)", "(noop robot)", "(unlockh human key3 door3)", "(noop robot)", "(down human)", "(noop robot)", "(unlockh human key4 door4)", "(noop robot)", "(down human)", "(noop robot)", "(down human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(left human)", "(noop robot)", "(pickuph human gem3)")
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,captions=captions,show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p4_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -296,7 +335,10 @@ function run_problem_4(option::Integer; complete = false)
         traj = PDDL.simulate(domain, state, plan)
         if complete == true
             sol = @pddl("(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(up robot)", "(noop human)", "(up robot)", "(noop human)", "(left robot)", "(noop human)", "(pickupr robot key5)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(pickupr robot key6)", "(noop human)", "(left robot)", "(noop human)", "(down robot)", "(noop human)", "(down robot)", "(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(down robot)", "(noop human)", "(handover robot human key5)", "(noop human)", "(handover robot human key6)", "(right human)", "(noop robot)", "(unlockh human key5 door1)", "(noop robot)", "(right human)", "(noop robot)", "(unlockh human key6 door2)", "(noop robot)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(up human)", "(noop robot)", "(pickuph human gem1)")
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p4_2_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -323,7 +365,10 @@ function run_problem_5(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem4)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p5_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -366,7 +411,10 @@ function run_problem_6(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem4)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p6_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -385,7 +433,10 @@ function run_problem_6(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p6_2_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -414,7 +465,10 @@ function run_problem_7(option::Integer; complete = false)
 
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p7_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -425,30 +479,6 @@ function run_problem_7(option::Integer; complete = false)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/p7_1.gif", anim, framerate=3, loop=-1) 
         end   
     end
-
-    # if option == 2
-
-    #     plan = @pddl("(right human)",  "(noop robot)", "(right human)",  "(noop robot)", "(right human)",  "(noop robot)", "(right human)",  "(noop robot)", "(right human)",  "(noop robot)", "(right human)",  "(noop robot)", "(right human)",  "(noop robot)","(pickuph human key2)",)
-    #     traj = PDDL.simulate(domain, state, plan)
-    #     captions = Dict(
-    #         1 => "...",
-    #         15 => "Human: \"Can you pass me the red key?\""
-    #         )
-    #     anim = anim_plan(renderer, domain, state, plan, trail_length = 15 ,captions=captions,caption_size=28, show_inventory = true, framerate=3)
-    #     save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/p7_2.gif", anim, framerate=3, loop=-1)    
-    # end
-
-    # if option == 3
-
-    #     plan = @pddl("(right human)",  "(noop robot)", "(right human)","(noop robot)","(right human)","(noop robot)","(right human)","(noop robot)")
-    #     traj = PDDL.simulate(domain, state, plan)
-    #     captions = Dict(
-    #         1 => "...",
-    #         8 => "Human: \"Can you get the blue key for me?\""
-    #         )
-    #     anim = anim_plan(renderer, domain, state, plan, trail_length = 15 ,captions=captions,caption_size=28, show_inventory = true, framerate=3)
-    #     save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/p7_3.gif", anim, framerate=3, loop=-1)    
-    # end
 
 end
 
@@ -468,7 +498,10 @@ function run_problem_8(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem4)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p8_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -491,7 +524,10 @@ function run_problem_8(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem4)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p8_2_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -518,7 +554,10 @@ function run_problem_9(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p9_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -533,7 +572,7 @@ end
 
 
 function run_problem_10(option::Integer; complete = false)
-    
+    domain = load_domain(joinpath(path, "domain.pddl"))
 
     problem = load_problem(joinpath(path, "10.pddl"))
 
@@ -541,13 +580,15 @@ function run_problem_10(option::Integer; complete = false)
 
     if option == 1
 
-        # plan = @pddl("(left human)",  "(noop robot)", 5"(left human)",  "(noop robot)", "(left human)", "(noop robot)","(left human)",  "(noop robot)","(left human)",  "(noop robot)","(pickuph human key1)",  "(noop robot)", "(noop human)", "(noop robot)" )
         plan = @pddl("(noop human)",  "(noop robot)")
         traj = PDDL.simulate(domain, state, plan)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem1)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p10_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -568,7 +609,10 @@ function run_problem_10(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem4)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p10_2_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -597,7 +641,10 @@ function run_problem_11(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem1)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p11_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -617,7 +664,10 @@ function run_problem_11(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem4)", costs))
-            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p11_2_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -633,7 +683,6 @@ end
 
 
 
-
 function run_problem_12(option::Integer; complete = false)
     
 
@@ -646,8 +695,11 @@ function run_problem_12(option::Integer; complete = false)
         traj = PDDL.simulate(domain, state, plan)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
-            sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            sol = @pddl("(noop human)", "(left robot)", "(noop human)", "(left robot)", "(noop human)", "(up robot)", "(noop human)", "(pickupr robot key1)", "(noop human)", "(down robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(right human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(right robot)", "(noop human)", "(down robot)", "(noop human)", "(unlockr robot key1 door3)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(right human)", "(noop robot)", "(up human)", "(noop robot)", "(pickuph human gem2)")
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p12_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -665,7 +717,10 @@ function run_problem_12(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem1)", costs))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p12_2_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -683,6 +738,11 @@ function run_problem_13(option::Integer; complete = false)
 
     problem = load_problem(joinpath(path, "13.pddl"))
 
+    costs_d = (
+    pickuph=1.0,pickup=1.0, pickupr=1.0, handover=1.0, unlockh=1.0,unlockr=2.0, 
+    up=1.0, down=1.0, left=1.0, right=1.0, noop=0.1
+)
+
     state = initstate(domain, problem)
 
     if option == 1
@@ -692,7 +752,10 @@ function run_problem_13(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem3)", costs_d))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p13_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -712,7 +775,10 @@ function run_problem_13(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem1)", costs_d))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p13_2_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -740,7 +806,10 @@ function run_problem_14(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem4)", costs))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p14_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -755,7 +824,7 @@ end
 
 function run_problem_15(option::Integer; complete = false)
     
-
+    domain = load_domain(joinpath(path, "domain.pddl"))
     problem = load_problem(joinpath(path, "15.pddl"))
 
     state = initstate(domain, problem)
@@ -767,8 +836,11 @@ function run_problem_15(option::Integer; complete = false)
         traj = PDDL.simulate(domain, state, plan)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
-            sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem3)", costs))
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p15_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -798,7 +870,10 @@ function run_problem_16(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem3)", costs))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...\n...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p16_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -816,7 +891,10 @@ end
 
 function run_problem_17(option::Integer; complete = false)
     
-
+    costs = (
+    pickuph=1.0,pickup=1.0, pickupr=1.0, handover=1.0, unlockh=1.0,unlockr=1.0, 
+    up=1.0, down=1.0, left=1.0, right=1.0, noop=0.1
+)
     problem = load_problem(joinpath(path, "17.pddl"))
 
     state = initstate(domain, problem)
@@ -827,7 +905,10 @@ function run_problem_17(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p17_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -854,7 +935,10 @@ function run_problem_18(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem1)", costs_d))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p18_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -869,9 +953,7 @@ end
 
 function run_problem_19(option::Integer; complete = false )
     
-
     problem = load_problem(joinpath(path, "19.pddl"))
-
     state = initstate(domain, problem)
 
     if option == 1
@@ -880,14 +962,17 @@ function run_problem_19(option::Integer; complete = false )
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p19_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
                 1 => "...",
-                4 => "Human: \"Can you unlock this blue door?\""
+                4 => "Human: \"Can you pass me the blue key?\""
                 )
-            anim = anim_plan(renderer_door, domain, state, plan, trail_length = 15 ,captions=captions,caption_size=28, show_inventory = true, framerate=3)
+            anim = anim_plan(renderer, domain, state, plan, trail_length = 15 ,captions=captions,caption_size=28, show_inventory = true, framerate=3)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part1/p19_1.gif", anim, framerate=3, loop=-1)  
         end  
     end
@@ -907,7 +992,10 @@ function run_problem_20(option::Integer; complete = false)
         if complete == true
             astar = AStarPlanner(GoalManhattan(), save_search=true)
             sol = astar(domain, traj[end], MinActionCosts(pddl"(has human gem2)", costs))
-            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15 ,show_inventory = true, framerate=4)
+            captions = Dict(
+                1 => "...",
+                )
+            anim = anim_plan(renderer_door, domain, traj[end], sol, trail_length = 15, captions=captions, show_inventory = true, framerate=4, caption_color = :white ,caption_size=28)
             save("/Users/lance/Documents/GitHub/assistive-agent/stimuli/part2/p20_1_complete.gif", anim, framerate=4, loop=-1)
         else
             captions = Dict(
@@ -936,31 +1024,61 @@ function run_all(complete=false)
     run_problem_4(1; complete)
     run_problem_4(2; complete)
 
-
 end
 
 function run_2(complete=false)
     run_problem_5(1; complete)
+    println("5.1")
     run_problem_6(1; complete)
+    println("6.1")
     run_problem_6(2; complete)
+    println("6.2")
     run_problem_7(1; complete)
+    println("7.1")
     run_problem_8(1; complete)
+    println("8.1")
     run_problem_8(2; complete)
+    println("8.2")
     run_problem_9(1; complete)
+    println("9.1")
     run_problem_10(1; complete)
+    println("10.1")
     run_problem_10(2; complete)
+    println("10.2")
     run_problem_11(1; complete)
+    println("11.1")
     run_problem_11(2; complete)
+    println("11.2")
     run_problem_12(1; complete)
+    println("12.1")
     run_problem_12(2; complete)
+    println("12.2")
     run_problem_13(1; complete)
+    println("13.1")
     run_problem_13(2; complete)
+    println("13.2")
     run_problem_14(1; complete)
+    println("14.1")
     run_problem_15(1; complete)
+    println("15.1")
     run_problem_16(1; complete)
+    println("16.1")
     run_problem_17(1; complete)
+    println("17.1")
     run_problem_18(1; complete)
+    println("18.1")
     run_problem_19(1; complete)
+    println("19.1")
     run_problem_20(1; complete)
+    println("20.1")
 end
 
+run_all(false)
+run_all(true)
+
+run_problem_5(1, complete = false)
+run_problem_6(1, complete = false)
+
+run_2(true)
+
+run_demo(true)

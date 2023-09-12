@@ -43,8 +43,8 @@ end
 
 using HDF5, JLD
 
-save("/Users/lance/Documents/GitHub/assistive-agent/goalprob.jld", "prob", goal_prob_total)
-save("/Users/lance/Documents/GitHub/Plinf.jl/domains/assistive-agent/goalprob.jld", "top5", goal_top5)
+save("/Users/lance/Documents/GitHub/Plinf.jl/domains/Assistive/goalprob.jld", "prob", goal_prob_total)
+save("/Users/lance/Documents/GitHub/Plinf.jl/domains/Assistive/goalprob.jld", "top5", goal_top5)
 
 
 goal_top5 = Dict()
@@ -60,8 +60,8 @@ costs = (
     up=1.0, down=1.0, left=1.0, right=1.0, noop=0.1
 )
 
-domain = load_domain(joinpath(@__DIR__, "domain_1.pddl"))
-problem = load_problem(joinpath(@__DIR__, "1r.pddl"))
+domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
+problem = load_problem(joinpath(@__DIR__, "1.pddl"))
 
 state = initstate(domain, problem)
 
@@ -71,8 +71,8 @@ domain = CachedDomain(domain)
 
 heuristic = GoalCountHeuristic()
 planner = AStarPlanner(heuristic, save_search=true,max_nodes = 200000)
-goal =  "(exist ?k1 - key) (and (has robot ?k1)(iscolor ?k1 red))"
-spec = MinActionCosts(pddl"(exist ?k - key) (and (has robot ?k)(iscolor ?k red))", costs)
+goal =  "(exist (?k1 - key) (and (has robot ?k1)(iscolor ?k1 red)))"
+spec = MinActionCosts(pddl"(exist (?k - key) (and (has robot ?k)(iscolor ?k red)))", costs)
 spec = MinActionCosts(pddl"(has robot gem1)", costs)
 spec = MinActionCosts(pddl"(exists (?k - key) (and (has robot ?k) (iscolor ?k blue)))", costs)
 
@@ -80,24 +80,24 @@ sol = planner(domain, state, spec)
 
 
 
-for scenario_id in collect(keys(utterance_literal_dict))
-    domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
-    problem = load_problem(joinpath(@__DIR__, "$scenario_id.pddl"))
+# for scenario_id in collect(keys(utterance_literal_dict))
+#     domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
+#     problem = load_problem(joinpath(@__DIR__, "$scenario_id.pddl"))
 
-    state = initstate(domain, problem)
+#     state = initstate(domain, problem)
 
-    # Compile and cache domain for faster performance
-    domain, state = PDDL.compiled(domain, state)
-    domain = CachedDomain(domain)
+#     # Compile and cache domain for faster performance
+#     domain, state = PDDL.compiled(domain, state)
+#     domain = CachedDomain(domain)
 
-    heuristic = GoalManhattan()
-    planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^32) 
-    spec = MinActionCosts(goal, costs)
+#     heuristic = GoalManhattan()
+#     planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^32) 
+#     spec = MinActionCosts(goal, costs)
 
-    sol = astar(domain, state, spec)
+#     sol = astar(domain, state, spec)
 
-    for goal in goal_top5[scenario_id]
+#     for goal in goal_top5[scenario_id]
 
-    end
+#     end
 
-end
+# end
