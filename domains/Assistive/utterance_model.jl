@@ -25,23 +25,32 @@ gpt3 = GPT3GF(model="curie", stop="\n")
 # Input: (handover robot human key1) (handover robot human key2) where (iscolor key1 green) (iscolor key2 red)
 # Output: Can you pass me the green and the red key?
 # """
+
 utterance_examples = """
-Input: (unlockr robot key2 door1) where (iscolor door1 blue)
+Input: (unlock you ?key ?door) where (iscolor ?door blue)
 Output: Can you unlock the blue door?
-Input: (handover robot human key2) (pickuph human key1) where (iscolor key1 red) (iscolor key2 blue)
+Input: (pickup me ?key1) (pickup you ?key2) where (iscolor ?key1 red) (iscolor ?key2 blue)
 Output: I will get the red key, can you pick up the blue one?
-Input: (unlockr robot key3 door2) (unlockr robot key2 door3) where (iscolor door2 green) (iscolor door3 yellow)
-Output: Help me unlock the green and the yellow doors.
-Input: (pickupr robot key3) where (iscolor key3 yellow)
+Input: (unlock you ?key1 ?door1) (unlock you ?key2 ?door2) where (iscolor ?door1 green) (iscolor ?door2 yellow)
+Output: Help me unlock the green and yellow doors.
+Input: (pickup you ?key) where (iscolor ?key yellow)
 Output: Please pick up the yellow key.
-Input: (unlockr robot key1 door1) where (iscolor door1 red)
+Input: (unlock you ?key1 ?door1) (unlock you ?key1 ?door2)
+Output: Could you unlock these doors for me?
+Input: (handover you me ?key)
+Output: Can you hand me that key?
+Input: (unlock you ?key ?door) where (iscolor ?door red)
 Output: Can you unlock the red door for me?
-Input: (pickuph human key3) (unlockr robot key1 door1) where (iscolor key3 blue) (iscolor door1 red)
-Output: I will get the blue key, can you unlock the red door for me?
-Input: (pickuph human key3) (handover robot human key1) where (iscolor key3 blue) (iscolor key1 green)
-Output: Can you pick up the green key while I get the blue one?
-Input: (handover robot human key1) (handover robot human key2) where (iscolor key1 green) (iscolor key2 red)
-Output: Can you pass me the green and the red key?
+Input: (pickup me ?key1) (unlock you ?key2 ?door1) where (iscolor ?key1 blue) (iscolor ?door1 green)
+Output: I'm getting the blue key, can you open the green door?
+Input: (handover you me ?key) where (iscolor ?key blue)
+Output: Could you pass me the blue key?
+Input: (unlock you ?key ?door)
+Output: Unlock this door for me please.
+Input: (pickup you ?key1) (pickup me ?key2) where (iscolor ?key1 yellow) (iscolor ?key2 blue)
+Output: Can you pick up the yellow key while I get the blue one?
+Input: (handover you me ?key1) (handover you me ?key2) where (iscolor ?key1 green) (iscolor ?key2 red)
+Output: Hand me the green and the red keys.
 """
 
 
