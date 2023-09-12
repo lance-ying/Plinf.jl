@@ -8,9 +8,9 @@ utterance_example =
 A human and robot are collaborating to pick up keys and unlock doors.
 Your task is to translate possible subgoals for robot to natural-language commands so the human can assign the subgoal to the robot.
 
-Input: (exist (?d1 - door)(and (robot_unlock ?d1)(iscolor ?d1 red)))
+Input: (exist (?d1 - door)(and (unlocked-by robot ?d1)(iscolor ?d1 red)))
 Output: Can you unlock the red door?
-Input: (exist (?d1 - door)(and (robot_unlock ?d1)))
+Input: (exist (?d1 - door)(and (unlocked-by robot ?d1)))
 Output: Can you unlock that door?
 Input: (exist (?k1 - key)(and (has robot ?k1)(iscolor ?k1 blue)))
 Output: I need a blue key.

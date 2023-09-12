@@ -163,34 +163,34 @@ function generate_goal()
     for c in color
         for i in 1:3
             if i == 1
-                goal = "(exist (?d1 - door) (and (robot_unlock ?d1)(iscolor ?d1 $c)))"
+                goal = "(exist (?d1 - door) (and (unlocked-by robot ?d1)(iscolor ?d1 $c)))"
             end
             if i == 2
-                goal = "(exist (?d1 ?d2 - door) (and (robot_unlock ?d1)(robot_unlock ?d2)(iscolor ?d1 $c)(iscolor ?d2 $c)))"
+                goal = "(exist (?d1 ?d2 - door) (and (unlocked-by robot ?d1)(unlocked-by robot ?d2)(iscolor ?d1 $c)(iscolor ?d2 $c)))"
             end
             if i == 3
-                goal = "(exist (?d1 ?d2 ?d3 - door) (and (robot_unlock ?d1)(robot_unlock ?d2)(robot_unlock ?d3)(iscolor ?d1 $c)(iscolor ?d2 $c)(iscolor ?d3 $c)))"
+                goal = "(exist (?d1 ?d2 ?d3 - door) (and (unlocked-by robot ?d1)(unlocked-by robot ?d2)(unlocked-by robot ?d3)(iscolor ?d1 $c)(iscolor ?d2 $c)(iscolor ?d3 $c)))"
             end
             push!(goalset, goal)
         end
     end
 
     for pair in [ ["red","blue"], ["blue","yellow"], ["red","yellow"]]
-        goal = "(exist (?d1 ?d2 - door) (and (robot_unlock ?d1)(iscolor ?d1 $(pair[1]))(robot_unlock ?d2)(iscolor ?d2 $(pair[2]))))"
+        goal = "(exist (?d1 ?d2 - door) (and (unlocked-by robot ?d1)(iscolor ?d1 $(pair[1]))(unlocked-by robot ?d2)(iscolor ?d2 $(pair[2]))))"
         push!(goalset, goal)
     end
 
     for pair in [ ["red","blue"], ["blue","yellow"], ["red","yellow"]]
-        goal = "(exist (?d1 ?d2 ?d3 - door) (and (robot_unlock ?d1)(iscolor ?d1 $(pair[1]))(robot_unlock ?d2)(iscolor ?d2 $(pair[1]))(robot_unlock ?d3)(iscolor ?d3 $(pair[2]))))"
+        goal = "(exist (?d1 ?d2 ?d3 - door) (and (unlocked-by robot ?d1)(iscolor ?d1 $(pair[1]))(unlocked-by robot ?d2)(iscolor ?d2 $(pair[1]))(unlocked-by robot ?d3)(iscolor ?d3 $(pair[2]))))"
         push!(goalset, goal)
     end
 
     for pair in [ ["red","blue"], ["blue","yellow"], ["red","yellow"]]
-        goal = "(exist (?d1 ?d2 ?d3 - door) (and (robot_unlock ?d1)(iscolor ?d1 $(pair[1]))(robot_unlock ?d2)(iscolor ?d2 $(pair[2]))(robot_unlock ?d3)(iscolor ?d3 $(pair[2]))))"
+        goal = "(exist (?d1 ?d2 ?d3 - door) (and (unlocked-by robot ?d1)(iscolor ?d1 $(pair[1]))(unlocked-by robot ?d2)(iscolor ?d2 $(pair[2]))(unlocked-by robot ?d3)(iscolor ?d3 $(pair[2]))))"
         push!(goalset, goal)
     end
 
-    goal = "(exist (?d1 ?d1 ?d3 - door) (and (robot_unlock ?d1)(iscolor ?d1 red)(robot_unlock ?d2)(iscolor ?d2 blue)(robot_unlock ?d3)(iscolor ?d3 yellow)))"
+    goal = "(exist (?d1 ?d1 ?d3 - door) (and (unlocked-by robot ?d1)(iscolor ?d1 red)(unlocked-by robot ?d2)(iscolor ?d2 blue)(unlocked-by robot ?d3)(iscolor ?d3 yellow)))"
     push!(goalset, goal)
 
     return goalset
