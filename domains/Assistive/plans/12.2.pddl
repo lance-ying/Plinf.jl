@@ -1,4 +1,4 @@
-;Can you go and unlock that door?
+; Can you go and unlock that door?
 (up human)
 (noop robot)
 (up human)

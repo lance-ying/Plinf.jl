@@ -1,4 +1,4 @@
-;Can you unlock this blue door?
+; Can you unlock this blue door?
 (right human)
 (noop robot)
 (right human)

@@ -1,4 +1,4 @@
-;Can you help me unlock the blue door there?
+; Can you help me unlock the blue door there?
 (down human)
 (noop robot)
 (left human)
@@ -9,7 +9,7 @@
 (noop robot)
 (left human)
 (noop robot)
-(pickuph human key2)
+(pickup human key2)
 (noop robot)
 (right human)
 (noop robot)

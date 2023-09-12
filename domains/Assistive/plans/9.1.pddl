@@ -1,4 +1,4 @@
-;Can you go get the red key?
+; Can you go get the red key?
 (right human)
 (noop robot)
 (right human)

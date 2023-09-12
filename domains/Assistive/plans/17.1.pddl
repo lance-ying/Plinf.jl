@@ -1,4 +1,4 @@
-;Can you come and get this red door?
+; Can you come and get this red door?
 (down human)
 (noop robot)
 (down human)

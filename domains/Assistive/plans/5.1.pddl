@@ -1,4 +1,4 @@
-;Can you pass me the blue key?
+; Can you pass me the blue key?
 (down human)
 (noop robot)
 (down human)

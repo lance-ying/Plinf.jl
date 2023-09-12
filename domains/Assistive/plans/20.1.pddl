@@ -1,11 +1,11 @@
-;Can you come and get this blue door?
+; Can you come and get this blue door?
 (down human)
 (noop robot)
 (down human)
 (noop robot)
 (left human)
 (noop robot)
-(pickuph human key1)
+(pickup human key1)
 (noop robot)
 (right human)
 (noop robot)

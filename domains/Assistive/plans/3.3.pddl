@@ -1,4 +1,4 @@
-;I need a key for this red door.
+; I need a key for this red door.
 (up human)
 (noop robot)
 (up human)

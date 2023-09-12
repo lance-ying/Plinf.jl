@@ -1,4 +1,4 @@
-;Can I have the blue keys?
+; Can I have the blue keys?
 (right human)
 (noop robot)
 (right human)

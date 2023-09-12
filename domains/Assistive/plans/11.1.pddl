@@ -1,4 +1,4 @@
-;Can you get the key for this door?
+; Can you get the key for this door?
 (up human)
 (noop robot)
 (up human)
