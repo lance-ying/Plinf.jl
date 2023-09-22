@@ -1,4 +1,4 @@
-;Can you pass me the red keys?
+;Give me a red key for this door.
 (up human)
 (noop robot)
 (up human)

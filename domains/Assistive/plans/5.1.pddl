@@ -3,5 +3,3 @@
 (noop robot)
 (down human)
 (noop robot)
-(right human)
-(noop robot)
