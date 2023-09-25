@@ -1,3 +1,3 @@
-; I'm gonna get the blue key. Can you open the red door?
+; Can you open the red door there?
 (noop human)
 (noop robot)

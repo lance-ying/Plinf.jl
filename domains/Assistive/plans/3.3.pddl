@@ -1,9 +1,5 @@
-; I need a key for this red door.
+; I need a key for this yellow door.
 (up human)
 (noop robot)
 (up human)
-(noop robot)
-(left human)
-(noop robot)
-(left human)
 (noop robot)
