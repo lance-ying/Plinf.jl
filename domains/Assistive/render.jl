@@ -21,67 +21,15 @@ colordict = Dict(
 )
 
 # Construct gridworld renderer
-renderer_b = PDDLViz.GridworldRenderer(
-    resolution = (600, 700),
-    has_agent = false,
-    obj_renderers = Dict(
-        :agent => (d, s, o) -> o.name == :human ?
-            HumanGraphic() : RobotGraphic(),
-        # :key => (d, s, o) -> KeyGraphic(-0.1,-0.1,
-        #     visible=!s[Compound(:has, [o])],
-        #     # color=get_obj_color(s, o).name
-        #     color=colordict[get_obj_color(s, o).name]
-        # ),
-        :key => (d, s, o) -> MultiGraphic(KeyGraphic(-0.1,-0.1,
-            visible=!s[Compound(:has, [o])],
-            # color=get_obj_color(s, o).name
-            color=colordict[get_obj_color(s, o).name]
-        ),
-        TextGraphic(
-            string(o.name)[end:end], 0.3, 0.2, 0.5,
-            color=:black, font=:bold
-        )),
-        :door => (d, s, o) -> LockedDoorGraphic(
-            visible=s[Compound(:locked, [o])],
-            color=colordict[get_obj_color(s, o).name]
-        ),
-        :gem => (d, s, o) -> GemGraphic(
-            color=gem_colors[parse(Int, string(o.name)[end])]
-        )
-    ),
-    obj_type_z_order = [:door, :key, :gem, :agent],
-    show_inventory = true,
-    inventory_fns = [
-        (d, s, o) -> s[Compound(:has, [Const(:human), o])]
-    ],
-    inventory_types = [:item],
-    inventory_labels = ["Human Inventory"],
-    trajectory_options = Dict(
-        :tracked_objects => [Const(:human), Const(:robot)],
-        :tracked_types => Const[],
-        :object_colors => [:black, :slategray]
-    )
-)
-
 renderer = PDDLViz.GridworldRenderer(
     resolution = (600, 700),
     has_agent = false,
     obj_renderers = Dict(
         :agent => (d, s, o) -> o.name == :human ?
             HumanGraphic() : RobotGraphic(),
-        # :key => (d, s, o) -> KeyGraphic(-0.1,-0.1,
-        #     visible=!s[Compound(:has, [o])],
-        #     # color=get_obj_color(s, o).name
-        #     color=colordict[get_obj_color(s, o).name]
-        # ),
-        :key => (d, s, o) -> MultiGraphic(KeyGraphic(-0.1,-0.1,
-            # color=get_obj_color(s, o).name
+        :key => (d, s, o) -> KeyGraphic(
             color=colordict[get_obj_color(s, o).name]
         ),
-        TextGraphic(
-            string(o.name)[end:end], 0.3, 0.2, 0.5,
-            color=:black, font=:bold
-        )),
         :door => (d, s, o) -> LockedDoorGraphic(
             visible=s[Compound(:locked, [o])],
             color=colordict[get_obj_color(s, o).name]
@@ -105,30 +53,25 @@ renderer = PDDLViz.GridworldRenderer(
     )
 )
 
-renderer_door = PDDLViz.GridworldRenderer(
+# Construct gridworld renderer with labeled keys
+renderer_labeled_keys = PDDLViz.GridworldRenderer(
     resolution = (600, 700),
     has_agent = false,
     obj_renderers = Dict(
         :agent => (d, s, o) -> o.name == :human ?
             HumanGraphic() : RobotGraphic(),
-        # :key => (d, s, o) -> KeyGraphic(-0.1,-0.1,
-        #     visible=!s[Compound(:has, [o])],
-        #     # color=get_obj_color(s, o).name
-        #     color=colordict[get_obj_color(s, o).name]
-        # ),
-        :key => (d, s, o) -> KeyGraphic(
-            visible=!s[Compound(:has, [o])],
-            # color=get_obj_color(s, o).name
-            color=colordict[get_obj_color(s, o).name]
+        :key => (d, s, o) -> MultiGraphic(
+            KeyGraphic(-0.1,-0.1,
+                color=colordict[get_obj_color(s, o).name]
+            ),
+            TextGraphic(
+                string(o.name)[end:end], 0.3, 0.2, 0.5,
+                color=:black, font=:bold
+            )
         ),
-        :door => (d, s, o) -> MultiGraphic(LockedDoorGraphic(
+        :door => (d, s, o) -> LockedDoorGraphic(
             visible=s[Compound(:locked, [o])],
             color=colordict[get_obj_color(s, o).name]
-        ),
-        TextGraphic(
-            string(o.name)[end:end], 0.3, 0.2, 0.5,
-            color=:white, font=:bold
-        )
         ),
         :gem => (d, s, o) -> GemGraphic(
             color=gem_colors[parse(Int, string(o.name)[end])]
@@ -149,15 +92,41 @@ renderer_door = PDDLViz.GridworldRenderer(
     )
 )
 
-# Override Makie.convert_video to support GIF loop control
-function Makie.convert_video(input_path, output_path; loop=nothing, video_options...)
-    p, typ = splitext(output_path)
-    format = lstrip(typ, '.')
-    vso = Makie.VideoStreamOptions(; format=format, input=input_path,
-                                   rawvideo=false, video_options...)
-    cmd = Makie.to_ffmpeg_cmd(vso)
-    if format == "gif" && !isnothing(loop) # Append loop setting to options
-        cmd = `$cmd -loop $loop`
-    end
-    Makie.@ffmpeg_env run(`$cmd $output_path`)
-end
+# Construct gridworld renderer with labeled doors
+renderer_labeled_doors = PDDLViz.GridworldRenderer(
+    resolution = (600, 700),
+    has_agent = false,
+    obj_renderers = Dict(
+        :agent => (d, s, o) -> o.name == :human ?
+            HumanGraphic() : RobotGraphic(),
+        :key => (d, s, o) -> KeyGraphic(
+            color=colordict[get_obj_color(s, o).name]
+        ),
+        :door => (d, s, o) -> MultiGraphic(
+            LockedDoorGraphic(
+                visible=s[Compound(:locked, [o])],
+                color=colordict[get_obj_color(s, o).name]
+            ),
+            TextGraphic(
+                string(o.name)[end:end], 0.3, 0.2, 0.5,
+                color=:white, font=:bold
+            )
+        ),
+        :gem => (d, s, o) -> GemGraphic(
+            color=gem_colors[parse(Int, string(o.name)[end])]
+        )
+    ),
+    obj_type_z_order = [:door, :key, :gem, :agent],
+    show_inventory = true,
+    inventory_fns = [
+        (d, s, o) -> s[Compound(:has, [Const(:human), o])],
+        (d, s, o) -> s[Compound(:has, [Const(:robot), o])]
+    ],
+    inventory_types = [:item, :item],
+    inventory_labels = ["Human Inventory", "Robot Inventory"],
+    trajectory_options = Dict(
+        :tracked_objects => [Const(:human), Const(:robot)],
+        :tracked_types => Const[],
+        :object_colors => [:black, :slategray]
+    )
+)
