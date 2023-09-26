@@ -2,4 +2,4 @@
 (noop robot)
 (right human)
 (noop robot)
-; Can you unlock this blue door?
+; Can you pass me the blue key?

@@ -100,6 +100,6 @@ function load_plan_dataset(dir::AbstractString)
         utterances[name] = annotations
         splitpoints[name] = annotation_idxs
     end
-    sort!(names, by = x -> parse.(Int, match(r"\D*(\d+)\w?\.(\d+)", x).captures))
+    sort!(names, by = x -> parse.(Int, match(r"\D*(\d+)\w?\.(\d+)\..*", x).captures))
     return names, plans, utterances, splitpoints
 end
