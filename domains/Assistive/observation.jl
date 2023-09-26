@@ -50,7 +50,7 @@ utterance_dict = Dict(
     "8.2"=>"I will pick up the red key. Can you get a blue one?",
     "9.1"=>"Can you go get the red key?",
     "10.1"=>"I will pick up this red key. Can you find a yellow one?",
-    "10.2"=>"I will pick up the blue key. Can you get the yellow key?",
+    "10.2"=>"I will pick up this blue key. Can you find a yellow one?",
     "11.1"=>"Can you get the key for this door?",
     "11.2"=>"Can you get me a key for this door?",
     "12.1"=>"Can you come and unlock this door?",
@@ -62,7 +62,7 @@ utterance_dict = Dict(
     "16.1"=>"Can you get the blue door there? I'll pick up the key for the red door.",
     "17.1"=>"Can you come and get this red door?",
     "18.1"=>"Can you unlock this red door?",
-    "19.1"=>"Can you unlock this blue door?",
+    "19.1"=>"Can you pass me the blue key?",
     "20.1"=>"Can you come and get this blue door?"
 
 )
