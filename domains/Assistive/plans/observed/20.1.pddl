@@ -1,0 +1,12 @@
+(down human)
+(noop robot)
+(down human)
+(noop robot)
+(left human)
+(noop robot)
+(pickup human key1)
+(noop robot)
+(right human)
+(noop robot)
+(right human)
+; Can you come and get this blue door?

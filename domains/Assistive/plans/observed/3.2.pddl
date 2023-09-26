@@ -1,0 +1,11 @@
+(up human)
+(noop robot)
+(up human)
+(noop robot)
+(up human)
+(noop robot)
+(up human)
+(noop robot)
+(up human)
+(noop robot)
+; Give me a red key for this door?
