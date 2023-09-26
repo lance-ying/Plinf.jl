@@ -91,15 +91,15 @@ function load_plan_dataset(dir::AbstractString)
     names = String[]
     plans = Dict{String, Vector{Term}}()
     utterances = Dict{String, Vector{String}}()
-    splitpoints = Dict{String, Vector{Int}}()
+    utterance_times = Dict{String, Vector{Int}}()
     for path in paths
         name = splitext(path)[1]
         push!(names, name)
         plan, annotations, annotation_idxs = load_plan(joinpath(dir, path))
         plans[name] = plan
         utterances[name] = annotations
-        splitpoints[name] = annotation_idxs
+        utterance_times[name] = annotation_idxs
     end
     sort!(names, by = x -> parse.(Int, match(r"\D*(\d+)\w?\.(\d+)\..*", x).captures))
-    return names, plans, utterances, splitpoints
+    return names, plans, utterances, utterance_times
 end

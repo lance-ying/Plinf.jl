@@ -2,6 +2,8 @@ using PDDL, PDDLViz
 using SymbolicPlanners
 using Plinf
 
+using PDDLViz: RGBA, to_color, set_alpha
+
 """
     DKGCombinedCallback(renderer, domain; kwargs...)
 

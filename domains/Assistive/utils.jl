@@ -1,5 +1,4 @@
 using DataStructures: OrderedDict
-using PDDLViz: RGBA, to_color, set_alpha
 using Base: @kwdef
 
 import SymbolicPlanners: compute, get_goal_terms
@@ -78,32 +77,38 @@ GoalManhattan(domain::Domain, state::State) =
 
 function compute(heuristic::GoalManhattan,
                  domain::Domain, state::State, spec::Specification)
-  goals = get_goal_terms(spec)
-  has_goals = [g for g in goals if g.name == :has]
-  n_agents = length(heuristic.agents)
-  noop_cost = spec isa MinActionCosts ? spec.costs[:noop] : 1
-  dists = map(has_goals) do goal
-      if state[goal] return 0 end
-      agent, item = goal.args
-      item_loc = get_obj_loc(state, item; check_has=true)
-      agent_loc = get_obj_loc(state, agent)
-      agent_item_dist = sum(abs.(agent_loc .- item_loc))
-      min_other_dist = Inf
-      for other in heuristic.agents
-          other == agent && continue
-          other_loc = get_obj_loc(state, other)
-          other_dist = agent_item_dist
-          if !state[Compound(:has, Term[other, item])]
-              other_item_dist = sum(abs.(other_loc .- item_loc))
-              other_dist += other_item_dist * (n_agents - 1) + 1
-          end
-          min_other_dist = min(min_other_dist, other_dist)
-      end
-      agent_dist = agent_item_dist * (1 + noop_cost * (n_agents - 1))
-      return min(agent_dist, min_other_dist)
-  end
-  min_dist = length(dists) > 0 ? minimum(dists) : 0
-  return min_dist
+    goals = get_goal_terms(spec)
+    has_goals = [g for g in goals if g.name == :has]
+    n_agents = length(heuristic.agents)
+    if spec isa MinActionCosts
+        noop_cost = spec.costs[:noop]
+    elseif spec isa MinPerAgentActionCosts
+        noop_cost = spec.costs[heuristic.agents[2].name][:noop]
+    else
+        noop_cost = 1
+    end
+    dists = map(has_goals) do goal
+        if state[goal] return 0 end
+        agent, item = goal.args
+        item_loc = get_obj_loc(state, item; check_has=true)
+        agent_loc = get_obj_loc(state, agent)
+        agent_item_dist = sum(abs.(agent_loc .- item_loc))
+        min_other_dist = Inf
+        for other in heuristic.agents
+            other == agent && continue
+            other_loc = get_obj_loc(state, other)
+            other_dist = agent_item_dist
+            if !state[Compound(:has, Term[other, item])]
+                other_item_dist = sum(abs.(other_loc .- item_loc))
+                other_dist += other_item_dist * (n_agents - 1) + 1
+            end
+            min_other_dist = min(min_other_dist, other_dist)
+        end
+        agent_dist = agent_item_dist * (1 + noop_cost * (n_agents - 1))
+        return min(agent_dist, min_other_dist)
+    end
+    min_dist = length(dists) > 0 ? minimum(dists) : 0
+    return min_dist
 end
 
 """

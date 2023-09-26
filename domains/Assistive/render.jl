@@ -3,7 +3,7 @@ using PDDL, SymbolicPlanners
 using PDDLViz, GLMakie
 using Test
 
-import Makie: to_color
+using PDDLViz: RGBA, to_color, set_alpha
 
 # Define colors
 vibrant = PDDLViz.colorschemes[:vibrant]
