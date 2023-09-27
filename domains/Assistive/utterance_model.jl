@@ -1,168 +1,294 @@
-using Gen, GenGPT3
 using PDDL, SymbolicPlanners
+using Gen, GenGPT3
+using IterTools
+using Random
 
 include("utils.jl")
 
-# Define GPT-3 generative function
-gpt3 = GPT3GF(model="curie", stop="\n")
-
 # Example translations from salient actions to instructions/requests
-# utterance_examples = """
-# Input: (unlockr robot key2 door1) where (iscolor door1 blue)
-# Output: Can you unlock the blue door?
-# Input: (handover robot human key2) (pickuph human key1) where (iscolor key1 red) (iscolor key2 blue)
-# Output: I will get the red key, can you pick up the blue one?
-# Input: (unlockr robot key3 door2) (unlockr robot key2 door3) where (iscolor door2 green) (iscolor door3 yellow)
-# Output: Help me unlock the green and the yellow doors.
-# Input: (pickupr robot key3) where (iscolor key3 yellow)
-# Output: Please pick up the yellow key.
-# Input: (unlockr robot key1 door1) where (iscolor door1 red)
-# Output: Can you unlock the red door for me?
-# Input: (pickuph human key3) (unlockr robot key1 door1) where (iscolor key3 blue) (iscolor door1 red)
-# Output: I will get the blue key, can you unlock the red door for me?
-# Input: (pickuph human key3) (handover robot human key1) where (iscolor key3 blue) (iscolor key1 green)
-# Output: Can you pick up the green key while I get the blue one?
-# Input: (handover robot human key1) (handover robot human key2) where (iscolor key1 green) (iscolor key2 red)
-# Output: Can you pass me the green and the red key?
-# """
+utterance_examples = [
+    # Single assistant actions (no predicates)
+    ("(pickup you key1)",
+     "Get the key over there."),
+    ("(handover you me key1)",
+     "Can you hand me that key?"),
+    ("(unlock you key1 door1)",
+     "Unlock this door for me please."),
+    # Single assistant actions (with predicates)
+    ("(pickup you key1) where (iscolor key1 yellow)",
+     "Please pick up the yellow key."),
+    ("(handover you me key1) where (iscolor key1 blue)",
+     "Could you pass me the blue key?"),
+    ("(unlock you key1 door1) where (iscolor door1 blue)",
+     "Can you open the blue door?"),
+    # Multiple assistant actions (distinct)
+    ("(unlock you key1 door1) (handover you me key2)",
+     "Would you unlock the door and bring me that key?"),
+    ("(handover you me key1) (handover you me key2) where (iscolor key1 green) (iscolor key2 red)",
+     "Hand me the green and red keys."),
+    ("(unlock you key1 door1) (unlock you key2 door2) where (iscolor door1 green) (iscolor door2 yellow)",
+     "Help me unlock the green and yellow doors."),
+    # Multiple assistant actions (combined)
+    ("(pickup you key1) (pickup you key2) where (iscolor key1 green) (iscolor key2 green)",
+     "Can you go and get the green keys?"),
+    ("(handover you me key1) (handover you me key2) where (iscolor key1 red) (iscolor key2 red)",
+     "Can you pass me two red keys?"),
+    ("(unlock you key1 door1) (unlock you key2 door2) (unlock you key3 door3)",
+     "Could you unlock these three doors for me?"),
+    # Joint actions (all distinct)
+    ("(pickup me key1) (pickup you key2) where (iscolor key1 red) (iscolor key2 blue)",
+     "I will get the red key, can you pick up the blue one?"),
+    ("(unlock you key1 door1) (pickup me key2) where (iscolor door1 green) (iscolor key2 blue)",
+     "I'm getting the blue key, can you open the green door?"),
+    ("(pickup you key1) (pickup me key2) where (iscolor key1 yellow) (iscolor key2 blue)",
+     "Can you pick up the yellow key while I get the blue one?"),
+    # Joint actions (some combined)
+    ("(pickup me key1) (handover you me key2) (handover you me key3) where (iscolor key1 blue) (iscolor key2 yellow) (iscolor key3 yellow)",
+     "Can you hand me the yellow keys? I'm getting the blue one."),
+    ("(pickup me key1) (pickup me key2) (unlock you key3 door1) (unlock you key4 door2)",
+     "I'm picking up these keys, can you unlock those doors?"),
+    ("(handover you me key1) (handover you me key2) (pickup me ?gem1) where (iscolor key1 red) (iscolor key2 red) (iscolor gem1 green)",
+     "Pass me the red keys, I'm going for the green gem.")
+]
 
-utterance_examples = """
-Input: (unlock you ?key ?door) where (iscolor ?door blue)
-Output: Can you unlock the blue door?
-Input: (pickup me ?key1) (pickup you ?key2) where (iscolor ?key1 red) (iscolor ?key2 blue)
-Output: I will get the red key, can you pick up the blue one?
-Input: (unlock you ?key1 ?door1) (unlock you ?key2 ?door2) where (iscolor ?door1 green) (iscolor ?door2 yellow)
-Output: Help me unlock the green and yellow doors.
-Input: (pickup you ?key) where (iscolor ?key yellow)
-Output: Please pick up the yellow key.
-Input: (unlock you ?key1 ?door1) (unlock you ?key1 ?door2)
-Output: Could you unlock these doors for me?
-Input: (handover you me ?key)
-Output: Can you hand me that key?
-Input: (unlock you ?key ?door) where (iscolor ?door red)
-Output: Can you unlock the red door for me?
-Input: (pickup me ?key1) (unlock you ?key2 ?door1) where (iscolor ?key1 blue) (iscolor ?door1 green)
-Output: I'm getting the blue key, can you open the green door?
-Input: (handover you me ?key) where (iscolor ?key blue)
-Output: Could you pass me the blue key?
-Input: (unlock you ?key ?door)
-Output: Unlock this door for me please.
-Input: (pickup you ?key1) (pickup me ?key2) where (iscolor ?key1 yellow) (iscolor ?key2 blue)
-Output: Can you pick up the yellow key while I get the blue one?
-Input: (handover you me ?key1) (handover you me ?key2) where (iscolor ?key1 green) (iscolor ?key2 red)
-Output: Hand me the green and the red keys.
+Random.seed!(0)
+shuffled_examples = shuffle(utterance_examples)
+
 """
+    ActionCommand
 
-
-literal_prompt = """
-Input: (exist ?k1)(and (pickupr robot ?k1)(iscolor ?k1 blue))
-Output: Can you get the blue key?
-Input: (exist ?k1)(and (pickupr robot ?k1)(iscolor ?k1 blue))
-Output: I will get the red key, can you get the blue key?
-Input: (exist ?d1)(and (unlock robot ?d1)(iscolor ?d1 blue))
-Output: Can you open the blue door?
-Input: (exist ?d1)(and (unlocked ?d1)(iscolor ?d1 blue))
-Output: I will find a red key, can you unlock the blue door?
-Input: (exist ?k1 ?k2)(and (has robot ?k1)(iscolor ?k1 red)(has robot ?k2)(iscolor ?k2 blue))
-Output: Can you pass me the red and blue key?
-Input: (exist ?d1 ?d2)(and (unlocked ?d1)(unlocked ?d2)(iscolor ?d1 blue)(iscolor ?d2 blue))
-Output: Can you get the blue doors?
-Input: (exist ?d1 ?d2)(and (unlocked ?d1)(unlocked ?d2)(iscolor ?d1 red)(iscolor ?d2 blue))
-Output: Can you get the red and blue doors?
+A sequence of one or more actions to be executed, with optional predicate
+modifiers for action arguments.
 """
+struct ActionCommand
+    "Actions to be executed."
+    actions::Vector{Term}
+    "Predicate modifiers for action arguments."
+    predicates::Vector{Term}
+end
 
+"Replace arguments in an action command with variables."
+function lift_command(
+    command::ActionCommand, state::State;
+    ignore = [pddl"(me)", pddl"(you)"],
+)
+    args_to_vars = Dict{Const, Var}()
+    type_count = Dict{Symbol, Int}()
+    actions = map(command.actions) do act
+        args = map(act.args) do arg
+            arg in ignore && return arg
+            arg isa Const || return arg
+            var = get!(args_to_vars, arg) do
+                type = PDDL.get_objtype(state, arg)
+                count = get(type_count, type, 0) + 1
+                type_count[type] = count
+                name = Symbol(uppercasefirst(string(type)), count)
+                return Var(name)
+            end
+            return var
+        end
+        return Compound(act.name, args)
+    end
+    predicates = map(command.predicates) do pred
+        pred isa Compound || return pred
+        args = map(pred.args) do arg
+            arg isa Const || return arg
+            return get(args_to_vars, arg, arg)
+        end
+        return Compound(pred.name, args)
+    end
+    return ActionCommand(actions, predicates)
+end
 
-literal_prompt_VH = """
-Input: (and (has robot cutleryknife1)(has robot cutleryknife2))
-Output: Can you get two knives?
-Input: (and (has robot cutleryfork1)(has robot cutleryfork2)(has robot cutleryfork2))
-Output: Can you get two knives?
-Input: (exist ?k1)(and (has robot ?k1)(iscolor ?k1 blue))
-Output: I will get the red key, can you get the blue key?
-Input: (exist ?d1)(and (unlocked ?d1)(iscolor ?d1 blue))
-Output: Can you open the blue door?
-Input: (exist ?d1)(and (unlocked ?d1)(iscolor ?d1 blue))
-Output: I will find a red key, can you unlock the blue door?
-Input: (exist ?k1 ?k2)(and (has robot ?k1)(iscolor ?k1 red)(has robot ?k2)(iscolor ?k2 blue))
-Output: Can you pass me the red and blue key?
-Input: (exist ?d1 ?d2)(and (unlocked ?d1)(unlocked ?d2)(iscolor ?d1 blue)(iscolor ?d2 blue))
-Output: Can you get the blue doors?
-Input: (exist ?d1 ?d2)(and (unlocked ?d1)(unlocked ?d2)(iscolor ?d1 red)(iscolor ?d2 blue))
-Output: Can you get the red and blue doors?
-"""
+function Base.show(io::IO, ::MIME"text/plain", command::ActionCommand)
+    action_str = join(write_pddl.(command.actions), " ")
+    action_str = filter(!=('?'), action_str)
+    print(io, action_str)
+    if !isempty(command.predicates)
+        print(io, " where ")
+        pred_str = join(write_pddl.(command.predicates), " ")
+        pred_str = filter(!=('?'), pred_str)
+        print(io, pred_str)
+    end
+end
 
 "Extract salient actions (with predicate modifiers) from a plan."
-function extract_salient_actions(state::State, plan::AbstractVector{<:Term})
+function extract_salient_actions(
+    domain::Domain, state::State, plan::AbstractVector{<:Term};
+    salient_actions = [
+        (:pickup, 1, 2),
+        (:unlock, 1, 3),
+        (:handover, 1, 3)
+    ],
+    salient_predicates = [
+        (:iscolor, (d, s, o) -> get_obj_color(s, o))
+    ]
+)
     actions = Term[]
-    predicates = Term[]
+    agents = Const[]
+    predicates = Vector{Term}[]
     for act in plan # Extract manually-defined salient actions
-        if act.name == :handover # Check for handover actions
-            item = act.args[3]
-            item_color = get_obj_color(state, item)
-            color_pred = Compound(:iscolor, Term[item, item_color])
-            push!(predicates, color_pred)
-            push!(actions, act)
-        elseif act.name == :unlockr# Check for robot unlocking actions
-            door = act.args[3]
-            door_color = get_obj_color(state, door)
-            color_pred = Compound(:iscolor, Term[door, door_color])
-            push!(predicates, color_pred)
-            push!(actions, act)
-        end
-        if act.name == :pickuph # Check for handover actions
-            item = act.args[2]
-            print(item)
-            # if !(item in ["gem1", "gem2","gem3", "gem4"])
-            item_color = get_obj_color(state, item)
-            color_pred = Compound(:iscolor, Term[item, item_color])
-            if string(item_color)!="none"
-            push!(predicates, color_pred)
-            push!(actions, act)
-            # end
+        for (name, agent_idx, obj_idx) in salient_actions
+            if act.name == name
+                push!(actions, act)
+                push!(agents, act.args[agent_idx])
+                push!(predicates, Term[])
+                obj = act.args[obj_idx]
+                for (pred_name, pred_fn) in salient_predicates
+                    val = pred_fn(domain, state, obj)
+                    if val != pddl"(none)"
+                        pred = Compound(pred_name, Term[obj, val])
+                        push!(predicates[end], pred)
+                    end
+                end
             end
         end
     end
-    return actions, predicates
+    return actions, agents, predicates
 end
 
-function extract_goals()
-
-end
-
-"Construct utterance prompt from salient actions and predicates."
-function construct_utterance_prompt(
-    actions::Vector{Term}, predicates::Vector{Term},
+"Enumerate action commands from salient actions and predicates."
+function enumerate_commands(
+    actions::Vector{Term},
+    agents::Vector{Const},
+    predicates::Vector{Vector{Term}};
+    speaker = pddl"(human)",
+    listener = pddl"(robot)",
+    max_commanded_actions = 4,
+    max_distinct_actions = 2,
+    exclude_action_chains = true,
+    exclude_speaker_only_commands = true
 )
-    if isempty(actions) return "\n" end # Empty prompt if nothing to communicate
-    action_str = join(write_pddl.(actions), " ")
-    predicate_str = join(write_pddl.(predicates), " ")
-    prompt = utterance_examples * "Input: $action_str where $predicate_str\n"
-    prompt *= "Output:"
+    commands = ActionCommand[]
+    # Replace speaker and listener names in actions
+    actions = map(actions) do act
+        args = map(act.args) do arg
+            if arg == speaker
+                pddl"(me)"
+            elseif arg == listener
+                pddl"(you)"
+            else
+                arg
+            end
+        end
+        return Compound(act.name, args)
+    end
+    # Enumerate commands of increasing length
+    max_commanded_actions = min(max_commanded_actions, length(actions))
+    for n in 1:max_commanded_actions
+        # Iterate over subsets of planned actions
+        for idxs in IterTools.subsets(1:length(actions), n)
+            # Skip subsets where all actions are speaker actions
+            if exclude_speaker_only_commands
+                if all(a == speaker for a in @view(agents[idxs])) continue end
+            end
+            # Skip subsets with too many distinct actions
+            if n > max_distinct_actions
+                agent_act_pairs = [(agents[i], actions[i].name) for i in idxs]
+                agent_act_pairs = unique!(agent_act_pairs)
+                n_distinct_actions = length(agent_act_pairs)
+                if n_distinct_actions > max_distinct_actions continue end
+            end
+            # Skip subsets where future actions depend on previous ones
+            if exclude_action_chains
+                skip = false
+                objects = Set{Const}()
+                for act in @view(actions[idxs]), arg in act.args
+                    (arg == pddl"(you)" || arg == pddl"(me)") && continue
+                    if arg in objects
+                        skip = true
+                        break
+                    end
+                    push!(objects, arg)
+                end
+                skip && continue
+            end
+            # Add command without predicate modifiers
+            cmd = ActionCommand(actions[idxs], Term[])
+            push!(commands, cmd)
+            # Skip subsets with too many distinct predicate modifiers
+            if n > max_distinct_actions
+                action_groups = [Int[] for _ in agent_act_pairs]
+                for i in idxs
+                    agent, act = agents[i], actions[i]
+                    idx = findfirst(p -> p[1] == agent && p[2] == act.name,
+                                    agent_act_pairs)
+                    push!(action_groups[idx], i)
+                end
+                skip = false
+                for group in action_groups
+                    length(group) > 1 || continue
+                    ref_predicates = map(predicates[group[1]]) do pred
+                        obj, val = pred.args
+                        return Compound(pred.name, Term[Var(:X), val])
+                    end
+                    for i in group[2:end], pred in predicates[i]
+                        obj, val = pred.args
+                        lifted_pred = Compound(pred.name, Term[Var(:X), val])
+                        if lifted_pred ∉ ref_predicates
+                            skip = true
+                            break
+                        end
+                    end
+                    skip && break
+                end
+                skip && continue
+            end
+            # Add command with predicate modifiers
+            preds = reduce(vcat, @view(predicates[idxs]))
+            cmd = ActionCommand(actions[idxs], preds)
+            push!(commands, cmd)
+        end
+    end
+    return commands
+end
+
+"Construct utterance prompt from an action command and previous examples."
+function construct_utterance_prompt(command::ActionCommand, examples)
+    # Empty prompt if nothing to communicate
+    if isempty(command.actions) return "\n" end 
+    # Construct example string
+    example_strs = ["Input: $cmd\nOutput: $utt" for (cmd, utt) in examples]
+    example_str = join(example_strs, "\n")
+    command_str = repr(MIME"text/plain"(), command)
+    prompt = "$example_str\nInput: $command_str\nOutput:"
     return prompt
 end
 
-"Utterance model for human instructions using an LLM string likelihood."
-@gen function utterance_model(t, agent_state, env_state, act,
-                              domain, planner)
+# Define GPT-3 mixture generative function
+gpt3_mixture = GPT3Mixture(model="curie", stop="\n", max_tokens=64)
+
+"Pragmatic utterance model for human instructions using an LLM likelihood."
+@gen function pragmatic_utterance_model(
+    t, agent_state, env_state, act,
+    domain,
+    planner,
+    p_speak = 0.05,
+    examples = shuffled_examples
+)
+    # Decide whether utterance should be communicated
+    speak ~ bernoulli(p_speak)
+    # Return empty utterance if not speaking
+    !speak && return ""
     # Extract environment state, plann state and goal specification
     state = env_state
     sol = agent_state.plan_state.sol
     spec = convert(Specification, agent_state.goal_state)
     # Rollout planning solution to get future plan
-    future_plan = rollout_sol(domain, planner, state, sol, spec)
+    plan = rollout_sol(domain, planner, state, sol, spec)
     # Extract salient actions and predicates from plan
-    actions, predicates = extract_salient_actions(state, future_plan)
-    # end
-    # Decide whether utterance should be communicated
-    p_utterance = isempty(actions) ? 0.05 : 0.95
-    sample_utterance ~ bernoulli(p_utterance)
-    # Generate utterance from GPT-3
-    if sample_utterance
-        prompt = construct_utterance_prompt(actions, predicates)
-        utterance ~ gpt3(prompt)
-        # print(utterance)
-        return strip(utterance)
+    actions, agents, predicates = extract_salient_actions(domain, state, plan)
+    # Enumerate action commands
+    commands = enumerate_commands(actions, agents, predicates)
+    # Construct prompts for each action command
+    if isempty(commands)
+        prompts = ["\n"]
     else
-        return ""
+        prompts = map(commands) do command
+            construct_utterance_prompt(command, examples)
+        end
     end
+    # Sample utterance from GPT-3 mixture over prompts
+    utterance ~ gpt3_mixture(prompts)
+    return utterance
 end
