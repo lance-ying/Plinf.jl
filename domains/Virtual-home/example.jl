@@ -2,7 +2,8 @@ using PDDL, Printf
 using SymbolicPlanners, Plinf
 using Gen, GenParticleFilters
 using PDDLViz, GLMakie
-using DelimitedFiles
+using CSV, DataFrames
+using HDF5, JLD
 
 include("utils.jl")
 # include("ascii.jl")
@@ -15,12 +16,18 @@ include("render.jl")
 #     up=1.0, down=1.0, left=1.0, right=1.0, noop=0.01
 # )
 
+costs = (
+    pickup=1.0, takeout=1.0, putdown=1.0, noop=0.001, goal=0.0001
+)
+
+
+
 # Register PDDL array theory
 PDDL.Arrays.register!()
 
 # Set problem to load
 
-problem_id = 1
+problem_id = 3
 
 # Load domain and problem
 domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
@@ -30,13 +37,6 @@ problem = load_problem(joinpath(@__DIR__, "room.pddl"))
 state = initstate(domain, problem)
 
 # Define action costs
-costs = (
-    pickup=1.0, takeout=1.0, putdown=1.0, noop=0.01
-)
-
-
-goal_name = ["set_table1","set_table1b", "set_table2","set_table2b","set_table3","set_table3b","set_table4","set_table4b","wine1","wine1p","wine2","win2p","wine3","win3p","wine4","win4p","juice1","juice1p","juice2","juice2p","juice3","juice3p","juice4","juice4p","veggie_salad","chicken_salad","potato_stew","chicken_stew","salmon_stew"]
-
 
 # goals =  @pddl("(and (has cutleryfork1) (has cutleryknife1) (has plate1))", 
 # "(and (has cutleryfork1) (has cutleryknife1) (has plate1) (has bowl1))",
@@ -63,61 +63,33 @@ goal_name = ["set_table1","set_table1b", "set_table2","set_table2b","set_table3"
 # "(and (has waterglass1)(has waterglass2)(has waterglass3)(has waterglass4)(has juice1))",
 # "(and (has waterglass1)(has waterglass2)(has waterglass3)(has waterglass4)(has cutleryfork1)(has cutleryfork2)(has cutleryfork3)(has cutleryfork4)(has cupcake1)(has cupcake2)(has cupcake3)(has cupcake4)(has juice1))",
 # "(and (has onion1) (has tomato1) (has cucumber1) (has chefknife1))",
-# "(and (has onion1) (has tomato1) (has chicken1) (has chefknife1))",
-# "(and (has onion1) (has carrot1) (has potato1) (has wine1))",
-# "(and (has onion1) (has carrot1) (has salmon1) (has wine1))",
-# "(and (has onion1) (has carrot1) (has chicken1) (has wine1))"
+# "(and (has onion1) (has carrot1) (has potato1) (has potato1) (has wine1))"
 # )
 
 
-goals = @pddl("(and (on cutleryfork1 table1) (on cutleryknife1 table1) (on plate1 table1))",
-"(and (on cutleryfork1 table1)(on cutleryfork2 table1) (on cutleryknife1 table1)(on cutleryknife2 table1) (on plate1 table1)(on plate2 table1))",
-"(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1) (on cutleryknife1 table1)(on cutleryknife2 table1)(on cutleryknife3 table1) (on plate1 table1)(on plate2 table1)(on plate3 table1))",
-"(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryfork4 table1) (on cutleryknife1 table1)(on cutleryknife2 table1)(on cutleryknife3 table1)(on cutleryknife4 table1) (on plate1 table1)(on plate2 table1)(on plate3 table1)(on plate4 table1))",
-"(and (on cutleryfork1 table1)(on cutleryknife1 table1)(on plate1 table1)(on bowl1 table1))",
-"(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryknife1 table1)(on cutleryknife2 table1) (on plate1 table1)(on plate2 table1) (on bowl1 table1)(on bowl2 table1))",
-"(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryknife1 table1)(on cutleryknife2 table1)(on cutleryknife3 table1) (on plate1 table1)(on plate2 table1)(on plate3 table1) (on bowl1 table1)(on bowl2 table1)(on bowl3 table1))",
-"(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryfork4 table1) (on cutleryknife1 table1)(on cutleryknife2 table1)(on cutleryknife3 table1)(on cutleryknife4 table1) (on plate1 table1)(on plate2 table1)(on plate3 table1)(on plate4 table1) (on bowl1 table1)(on bowl2 table1)(on bowl3 table1)(on bowl4 table1))",
-"(and (on wineglass1 table1)(on wine1 table1))",
-"(and (on wineglass1 table1)(on wineglass2 table1) (on wine1 table1))",
-"(and (on wineglass1 table1)(on wineglass2 table1)(on wineglass3 table1) (on wine1 table1))",
-"(and (on wineglass1 table1)(on wineglass2 table1)(on wineglass3 table1)(on wineglass4 table1) (on wine1 table1))",
-"(and (on wineglass1 table1) (on cutleryfork1 table1)(on wine1 table1)(on cheese1 table1))",
-"(and (on wineglass1 table1)(on wineglass2 table1) (on cutleryfork1 table1)(on cutleryfork2 table1)(on wine1 table1)(on cheese1 table1))",
-"(and (on wineglass1 table1)(on wineglass2 table1)(on wineglass3 table1) (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on wine1 table1)(on cheese1 table1))",
-"(and (on wineglass1 table1)(on wineglass2 table1)(on wineglass3 table1)(on wineglass4 table1) (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryfork4 table1)(on wine1 table1)(on cheese1 table1))",
-"(and (on waterglass1 table1)(on juice1 table1))",
-"(and (on waterglass1 table1)(on waterglass2 table1)(on juice1 table1))",
-"(and (on waterglass1 table1)(on waterglass2 table1)(on waterglass3 table1)(on juice1 table1))",
-"(and (on waterglass1 table1)(on waterglass2 table1)(on waterglass3 table1)(on waterglass4 table1)(on juice1 table1))",
-"(and (on waterglass1 table1)(on cutleryfork1 table1)(on cupcake1 table1)(on juice1 table1))",
-"(and (on waterglass1 table1)(on waterglass2 table1)(on cutleryfork1 table1)(on cutleryfork2 table1)(on cupcake1 table1)(on cupcake2 table1)(on juice1 table1))",
-"(and (on waterglass1 table1)(on waterglass2 table1)(on waterglass3 table1)(on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cupcake1 table1)(on cupcake2 table1)(on cupcake3 table1)(on juice1 table1))",
-"(and (on waterglass1 table1)(on waterglass2 table1)(on waterglass3 table1)(on waterglass4 table1)(on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryfork4 table1)(on cupcake1 table1)(on cupcake2 table1)(on cupcake3 table1)(on cupcake4 table1)(on juice1 table1))",
-"(and (on onion1 table1) (on cucumber1 table1) (on tomato1 table1) (on chefknife1 table1))",
-"(and (on onion1 table1) (on cucumber1 table1) (on chicken1 table1) (on chefknife1 table1))",
-"(and (on onion1 table1) (on carrot1 table1) (on chicken1 table1) (on wine1 table1))",
-"(and (on onion1 table1) (on carrot1 table1) (on salmon1 table1) (on wine1 table1))",
-"(and (on onion1 table1) (on carrot1 table1) (on potato1 table1) (on wine1 table1))")
+
+# Construct goal specification
+spec = Specification(pddl"(and (has cutleryfork1)(has cutleryfork2)(has cutleryfork3) (has cutleryknife1)(has cutleryknife2)(has cutleryknife3) (has plate1)(has plate2)(has plate3) (has bowl1)(has bowl2)(has bowl3))")
+spec = Specification(pddl"(and (on onion1 table1) (on potato1 table1) (on potato1 table1) (on wine1 table1))")
+
+# spec = Specification(pddl"(exist ?o - onion ?b - potato ?c - carrot ?p - potato ?w - wine)(and (on ?o table1) (on ?c table1) (on ?p table1) (on ?w table1))")
+spec = Specification(pddl"(and (has human onion1) (has human carrot1))")
+# spec = Specification(pddl"(has human onion1)")
 
 # Compile and cache domain for faster performance
 domain, state = PDDL.compiled(domain, state)
-
 domain = CachedDomain(domain)
 
 # Visualize initial state
 # canvas = renderer(domain, state)
 
 #--- Visualize Plans ---#
-heuristic = memoized(precomputed(FFHeuristic(), domain, state))
-# heuristic = GoalCountHeuristic()
+
 # Check that A* heuristic search correctly solves the problem
-# astar = AStarPlanner(heuristic,  max_nodes=10000)
-# spec = MinActionCosts(Term[pddl"(and (on cutleryfork1 table1) (on cutleryknife1 table1) (on plate1 table1))"], costs)
+astar = AStarPlanner(heuristic,  max_nodes=10000)
 
-# sol = astar(domain, state, pddl"(and (on cutleryfork1 table1) (on cutleryknife1 table1) (on plate1 table1))")
-planner = RTDP(heuristic=heuristic, n_rollouts=100) 
-
+spec = Specification(goals[8])
+sol = astar(domain, state, spec)
 
 # Visualize solution 
 # plan = collect(sol)
@@ -134,8 +106,7 @@ goal_names = [write_pddl(g) for g in goals]
 # Define uniform prior over possible goals
 @gen function goal_prior()
     goal ~ uniform_discrete(1, length(goals))
-    return Specification(Term[goals[goal]])
-    # return MinActionCosts(Term[goals[goal]], costs)
+    return MinActionCosts(Term[goals[goal]], costs)
 end
 
 # Construct iterator over goal choicemaps for stratified sampling
@@ -149,10 +120,14 @@ goal_strata = choiceproduct((goal_addr, 1:length(goals)))
 # heuristic = RelaxedMazeDist(GoalManhattan())
 # heuristic = memoized(GoalManhattan())
 
-# heuristic = GoalCountHeuristic()
-# planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=1000) 
+heuristic = memoized(precomputed(FFHeuristic(), domain, state))
 
-planner = RTDP(heuristic=heuristic, n_rollouts=100) 
+# heuristic = memoized(precomputed(HAddHeuristic(), domain, state))
+
+# heuristic = GoalCountHeuristic()
+# planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=1000, verbose = true) 
+
+planner = RTDP(heuristic=heuristic, n_rollouts=0) 
 
 # planner = RTDP(heuristic=heuristic, n_rollouts=100) 
 
@@ -185,9 +160,9 @@ world_config = WorldConfig(
 # plans, utterances, splitpoints = load_plan_dataset(joinpath(@__DIR__, "plans"))
 # plan = @pddl("(up human)","(noop robot)","(up human)","(noop robot)","(up human)","(noop robot)","(up human)","(noop robot)","(right human)","(noop robot)")
 # utterance = "Can you give me a red key?"
-plan = action_dict[1]
+plan = @pddl("(takeout human wine1 fridge1)","(noop robot)","(noop human)","(noop robot)")
 
-plan = @pddl("(takeout human plate1 cabinet2)" ,"(noop robot)","(takeout human plate2 cabinet2)","(noop robot)")
+
 
 obs_traj = PDDL.simulate(domain, state, plan)
 
@@ -197,7 +172,8 @@ t_obs_iter = act_choicemap_pairs(plan)
 callback = DKGCombinedCallback(renderer,domain; render=false, goal_names = goal_name)
 
 # Configure SIPS particle filter
-sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
+
+ps = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
          
 # ENV["OPENAI_API_KEY"] = "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"
 # Run particle filter to perform online goal inference
