@@ -19,7 +19,7 @@ colordict = Dict(
 )
 
 # Construct gridworld renderer
-renderer = PDDLViz.GridworldRenderer(
+RENDERER = PDDLViz.GridworldRenderer(
     resolution = (600, 700),
     has_agent = false,
     obj_renderers = Dict(
@@ -52,7 +52,7 @@ renderer = PDDLViz.GridworldRenderer(
 )
 
 # Construct gridworld renderer with labeled keys
-renderer_labeled_keys = PDDLViz.GridworldRenderer(
+RENDERER_LABELED_KEYS = PDDLViz.GridworldRenderer(
     resolution = (600, 700),
     has_agent = false,
     obj_renderers = Dict(
@@ -91,7 +91,7 @@ renderer_labeled_keys = PDDLViz.GridworldRenderer(
 )
 
 # Construct gridworld renderer with labeled doors
-renderer_labeled_doors = PDDLViz.GridworldRenderer(
+RENDERER_LABELED_DOORS = PDDLViz.GridworldRenderer(
     resolution = (600, 700),
     has_agent = false,
     obj_renderers = Dict(
@@ -127,6 +127,13 @@ renderer_labeled_doors = PDDLViz.GridworldRenderer(
         :tracked_types => Const[],
         :object_colors => [:black, :slategray]
     )
+)
+
+# Maps from assistance types to renderers
+renderer_dict = Dict(
+    "none" => RENDERER,
+    "keys" => RENDERER_LABELED_KEYS,
+    "doors" => RENDERER_LABELED_DOORS
 )
 
 "Adds a subplot to a storyboard with a line plot of goal probabilities."

@@ -260,7 +260,7 @@ gpt3_mixture = GPT3Mixture(model="curie", stop="\n", max_tokens=64)
 
 "Pragmatic utterance model for human instructions using an LLM likelihood."
 @gen function pragmatic_utterance_model(
-    t, agent_state, env_state, act,
+    t, act_state, agent_state, env_state, act,
     domain,
     planner,
     p_speak = 0.05,
