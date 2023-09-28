@@ -1,7 +1,10 @@
 using PDDL, SymbolicPlanners
 using Gen, GenParticleFilters
 using Plinf
+using Printf
 using PDDLViz, GLMakie
+
+using GenParticleFilters: softmax
 
 include("utils.jl")
 include("plan_io.jl")
@@ -37,7 +40,7 @@ PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 ## Set-up for specific plan and problem ##
 
 # Select plan and problem
-plan_id = "1.1.keys"
+plan_id = "2.1.keys"
 
 plan = PLANS[plan_id]
 utterances = UTTERANCES[plan_id]
@@ -56,6 +59,33 @@ end
 
 # Construct initial state
 state = initstate(domain, problem)
+
+## Run literal listener inference ##
+
+# Enumerate over robot-directed commands
+actions, agents, predicates = enumerate_salient_actions(domain, state)
+commands = enumerate_commands(actions, agents, predicates)
+commands = lift_command.(commands, [state])
+unique!(commands)
+
+# Generate constrained trace from literal listener model
+choices = choicemap((:utterance => :output, utterances[1]))
+trace, _ = generate(literal_utterance_model, (domain, state, commands), choices)
+
+# Extract unnormalized log-probabilities of utterance conditioned on each command
+command_scores = extract_utterance_scores_per_command(trace)
+
+# Compute posterior probability of each command
+command_probs = softmax(scores)
+
+# Get top 5 commands most probable commands
+top_command_idxs = sortperm(scores, rev=true)[1:5]
+
+# Print commands and their probabilities
+for idx in top_command_idxs
+    command_str = repr("text/plain", commands[idx])
+    @printf("%.3f: %s\n", command_probs[idx], command_str)
+end
 
 ## Configure agent and world model ##
 
