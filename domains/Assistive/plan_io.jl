@@ -81,13 +81,17 @@ function write_plan(
 end
 
 """
-    load_plan_dataset(dir::AbstractString)
+    load_plan_dataset(dir::AbstractString, [pattern::Regex])
 
-Load utterance-annotated plan dataset from a directory.
+Load utterance-annotated plan dataset from a directory. The `pattern` 
+argument is a regular expression that matches the filenames of each plan.
 """
-function load_plan_dataset(dir::AbstractString)
+function load_plan_dataset(
+    dir::AbstractString, pattern::Regex=r"^(\d+)\w?\.(\d+)\..*"
+)
     paths = readdir(dir)
     filter!(path -> endswith(path, ".pddl"), paths)
+    filter!(path -> match(pattern, splitext(path)[1]) !== nothing, paths)
     names = String[]
     plans = Dict{String, Vector{Term}}()
     utterances = Dict{String, Vector{String}}()
@@ -100,6 +104,6 @@ function load_plan_dataset(dir::AbstractString)
         utterances[name] = annotations
         utterance_times[name] = annotation_idxs
     end
-    sort!(names, by = x -> parse.(Int, match(r"\D*(\d+)\w?\.(\d+)\..*", x).captures))
+    sort!(names, by = x -> parse.(Int, match(pattern, x).captures))
     return names, plans, utterances, utterance_times
 end

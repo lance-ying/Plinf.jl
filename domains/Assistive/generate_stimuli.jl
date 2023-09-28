@@ -9,11 +9,50 @@ include("plan_io.jl")
 include("utils.jl")
 include("render.jl")
 
-renderer_dict = Dict(
-    "none" => renderer,
-    "keys" => renderer_labeled_keys,
-    "doors" => renderer_labeled_doors,
+"Generates stimulus plan completion."
+function generate_stim_completion(
+    path::Union{AbstractString, Nothing},
+    domain::Domain,
+    problem::Problem,
+    plan::AbstractVector{<:Term};
+    kwargs...
 )
+    state = initstate(domain, problem)
+    goal = PDDL.get_goal(problem)
+    return generate_stim_completion(path, domain, state, plan, goal; kwargs...)
+end
+
+function generate_stim_completion(
+    path::Union{AbstractString, Nothing},
+    domain::Domain,
+    state::State,
+    plan::AbstractVector{<:Term},
+    goal::Union{Term, AbstractVector{<:Term}};
+    action_costs = (
+        human=(
+            pickup=2.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.5
+        ),
+        robot = (
+            pickup=1.0, unlock=2.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.5
+        )
+    )
+)
+    # Simulate state after observed plan has been executed
+    state = PDDL.simulate(PDDL.EndStateSimulator(), domain, state, plan)
+    # Construct planner and goal specification
+    planner = AStarPlanner(GoalManhattan())
+    spec = MinPerAgentActionCosts(PDDL.flatten_conjs(goal), action_costs)
+    # Solve for plan completion
+    sol = planner(domain, state, spec)
+    completion = collect(sol)
+    # Save plan completion to file
+    if !isnothing(path)
+        save_plan(path, completion)
+    end
+    return completion
+end
 
 "Generates stimulus animation for an utterance-annotated plan."
 function generate_stim_anim(
@@ -212,7 +251,7 @@ end
 function read_stim_inputs(
     name::String, problems, plans, completions, utterances, utterance_times
 )
-    m = match(r"(\d+\w?).(\d+)\.(\w+)", name)
+    m = match(r"^(\w*\d+\w?).(\d+)\.(\w+)", name)
     problem_name = m.captures[1]
     assist_type = m.captures[3]
     problem = problems[problem_name]
@@ -242,10 +281,31 @@ end
 
 # Load utterance-annotated plans and completions
 pnames, plans, utterances, utterance_times = load_plan_dataset(PLAN_DIR)
-pnames, completions, _, _ = load_plan_dataset(COMPLETION_DIR)
+pnames_c, completions, _, _ = load_plan_dataset(COMPLETION_DIR)
+
+# Generate stimuli completions if they don't exist
+for name in pnames
+    name in pnames_c && continue
+    # Load problem
+    m = match(r"^(\w*\d+\w?).(\d+)\.(\w+)", name)
+    problem_name = m.captures[1]
+    problem = problems[problem_name]
+    # Compile domain for problem
+    state = initstate(domain, problem)
+    c_domain, _ = PDDL.compiled(domain, state)
+    # Generate and save completion
+    println("Generating completion for $name...")
+    plan = plans[name]
+    c_path = joinpath(COMPLETION_DIR, name * ".pddl")
+    completion = generate_stim_completion(c_path, c_domain, problem, plan)
+end
+
+# Reload completions
+pnames_c, completions, _, _ = load_plan_dataset(COMPLETION_DIR)
 
 # Generate stimuli animations
 for name in pnames
+    println("Generating animations for $name...")
     problem, plan, completion, utts, utt_times, assist_type =
         read_stim_inputs(name, problems, plans, completions,
                          utterances, utterance_times)
@@ -259,6 +319,7 @@ end
 # Generate stimuli metadata
 all_metadata = []
 for name in pnames
+    println("Generating metadata for $name...")
     problem, plan, completion, utts, utt_times, assist_type =
         read_stim_inputs(name, problems, plans, completions,
                          utterances, utterance_times)
@@ -269,4 +330,44 @@ end
 metadata_path = joinpath(STIMULI_DIR, "stimuli.json")
 open(metadata_path, "w") do io
     JSON3.pretty(io, all_metadata)
+end
+
+# Load demonstration plans and completions
+pnames, plans, utterances, utterance_times =
+    load_plan_dataset(PLAN_DIR, r"demo(\d+)\.(\d+)\.\w+")
+pnames_c, completions, _, _ =
+    load_plan_dataset(COMPLETION_DIR, r"demo(\d+)\.(\d+)\.\w+")
+
+# Generate demonstration completions if they don't exist
+for name in pnames
+    name in pnames_c && continue
+    # Load problem
+    m = match(r"^(\w*\d+\w?).(\d+)\.(\w+)", name)
+    problem_name = m.captures[1]
+    problem = problems[problem_name]
+    # Compile domain for problem
+    state = initstate(domain, problem)
+    c_domain, _ = PDDL.compiled(domain, state)
+    # Generate and save completion
+    println("Generating completion for $name...")
+    plan = plans[name]
+    c_path = joinpath(COMPLETION_DIR, name * ".pddl")
+    completion = generate_stim_completion(c_path, c_domain, problem, plan)
+end
+
+# Reload completions
+pnames_c, completions, _, _ =
+    load_plan_dataset(COMPLETION_DIR, r"demo(\d+)\.(\d+)\.\w+")
+
+# Generate demonstration animations
+for name in pnames
+    println("Generating animations for $name...")
+    problem, plan, completion, utts, utt_times, assist_type =
+        read_stim_inputs(name, problems, plans, completions,
+                         utterances, utterance_times)
+
+    path = joinpath(STIMULI_DIR, name * ".gif")
+    generate_stim_anim_set(path, domain, problem, plan, completion,
+                           utts, utt_times; assist_type)
+    GC.gc()
 end

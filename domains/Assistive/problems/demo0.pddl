@@ -82,5 +82,5 @@
          (forbidden robot gem2)
          (forbidden robot gem3)
          (forbidden robot gem4))
-  (:goal (has human gem4))
+  (:goal (has human gem2))
 )
