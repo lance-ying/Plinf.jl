@@ -3,7 +3,7 @@
   (:objects door1 door2 door3 door4 door5 - door
             key1 key2 key3 key4 key5 - key
             gem1 gem2 gem3 gem4 - gem
-            red blue yellow - color
+            red yellow blue green - color
             robot - robot
             human - human)
   (:init (= (walls) (new-bit-matrix false 10 12))
