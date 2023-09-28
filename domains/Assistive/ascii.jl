@@ -19,6 +19,7 @@ function ascii_to_pddl(
         'E' => pddl"(green)",
         'P' => pddl"(pink)"
     ),
+    gem_colors = [pddl"(red)", pddl"(yellow)", pddl"(blue)", pddl"(green)"],
     forbidden = [(pddl"(robot)", :gem)]
 )
     rows = split(str, "\n", keepempty=false)
@@ -66,6 +67,14 @@ function ascii_to_pddl(
     end
     append!(init, start_human)
     append!(init, start_robot)
+    # Add gem colors
+    for g in gems
+        c = gem_colors[parse(Int, string(g.name)[end])]
+        push!(init, parse_pddl("(iscolor $g $c)"))
+        if !(c in colors)
+            push!(colors, c)
+        end
+    end
     # Add turn-taking predicates
     init_turn = parse_pddl(
         "(active human)",
