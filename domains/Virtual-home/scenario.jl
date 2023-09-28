@@ -59,7 +59,7 @@ action_dict = Dict(1=>@pddl("(takeout human wine1 fridge1)","(noop robot)", "(ta
 
 utterance_dict=Dict(
     1=>"Can you get 2 more glasses?",
-    2=>"Can you get more plates and some forks and knives for 4 people?",
+    2=>"Can you get more plates and some forks and knives? We have 4 people.",
     3=>"I've got the plates, can you get the forks and knives?",
     4=>"We need some cutleries.",
     5=>"Can you get the carrot and onion for the stew?",
@@ -82,7 +82,7 @@ utterance_dict=Dict(
 
 utterance_dict_literal=Dict(
     1=>"Can you get 2 more glasses?",
-    2=>"Can you get more plates and some forks and knives for 4 people?",
+    2=>"Can you get more plates and some forks and knives? We have 4 people.",
     3=>"Can you get the forks and knives?",
     4=>"We need some cutlery.",
     5=>"Can you get the carrot and onion for the stew?",
