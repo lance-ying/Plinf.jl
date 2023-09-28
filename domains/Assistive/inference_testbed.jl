@@ -8,6 +8,7 @@ using GenParticleFilters: softmax
 
 include("utils.jl")
 include("plan_io.jl")
+include("utterance_model.jl")
 include("render.jl")
 include("callbacks.jl")
 
@@ -76,10 +77,10 @@ trace, _ = generate(literal_utterance_model, (domain, state, commands), choices)
 command_scores = extract_utterance_scores_per_command(trace)
 
 # Compute posterior probability of each command
-command_probs = softmax(scores)
+command_probs = softmax(command_scores)
 
 # Get top 5 commands most probable commands
-top_command_idxs = sortperm(scores, rev=true)[1:5]
+top_command_idxs = sortperm(command_scores, rev=true)[1:5]
 
 # Print commands and their probabilities
 for idx in top_command_idxs

@@ -2,6 +2,7 @@ using PDDL, SymbolicPlanners
 using Gen, GenGPT3
 using IterTools
 using Random
+using StatsBase
 
 include("utils.jl")
 
@@ -118,6 +119,73 @@ function lift_command(
     return ActionCommand(actions, predicates)
 end
 
+"Grounds a lifted action command into a set of ground action commands."
+function ground_command(
+    command::ActionCommand, domain::Domain, state::State
+)
+    # Extract variables and infer their types
+    vars = Var[]
+    types = Symbol[]
+    for act in command.actions
+        for arg in act.args
+            arg isa Var || continue
+            push!(vars, arg)
+            type = Symbol(lowercase(string(arg.name)[1:end-1]))
+            push!(types, type)
+        end
+    end
+    # Find all possible groundings
+    typeconds = Term[Compound(ty, Term[var]) for (ty, var) in zip(types, vars)]
+    neqconds = Term[Compound(:not, [Compound(:(==), Term[vars[i], vars[j]])])
+                    for i in eachindex(vars) for j in 1:i-1]
+    conds = [command.predicates; neqconds; typeconds]
+    substs = satisfiers(domain, state, conds)
+    g_commands = ActionCommand[]
+    for s in substs
+        actions = map(act -> PDDL.substitute(act, s), command.actions)
+        predicates = map(pred -> PDDL.substitute(pred, s), command.predicates)
+        push!(g_commands, ActionCommand(actions, predicates))
+    end
+    return g_commands
+end
+
+"Convert an action command to a sequence of one or more action goals."
+function command_to_goals(command::ActionCommand)
+    goals = map(command.actions) do action
+        # Extract variables and infer their types
+        vars = Var[]
+        types = Symbol[]
+        for arg in action.args
+            arg isa Var || continue
+            push!(vars, arg)
+            type = Symbol(lowercase(string(arg.name)[1:end-1]))
+            push!(types, type)
+        end
+        # Find predicate constraints which include some variables
+        constraints = filter(pred -> any(arg in vars for arg in pred.args),
+                             command.predicates)
+        # Add type constraints
+        typeconds = Term[Compound(ty, Term[v]) for (ty, v) in zip(types, vars)]
+        constraints = append!(constraints, typeconds)
+        return ActionGoal(action, constraints)
+    end
+    return goals
+end
+
+"Extract focal objects from an action command."
+function extract_focal_objects(
+    command::ActionCommand;
+    obj_arg_idxs = Dict(:pickup => 2, :handover => 3, :unlock => 3)
+)
+    objects = Const[]
+    for act in command.actions
+        idx = obj_arg_idxs[act.name]
+        obj = act.args[idx]
+        push!(objects, obj)
+    end
+    return unique!(objects)
+end
+
 "Extract salient actions (with predicate modifiers) from a plan."
 function extract_salient_actions(
     domain::Domain, state::State, plan::AbstractVector{<:Term};
@@ -153,6 +221,7 @@ function extract_salient_actions(
     return actions, agents, predicates
 end
 
+"Enumerate all possible salient actions (with predicate modifiers) in a state."
 function enumerate_salient_actions(
     domain::Domain, state::State;
     salient_actions = [
@@ -318,6 +387,7 @@ end
 # Define GPT-3 mixture generative function
 gpt3_mixture = GPT3Mixture(model="curie", stop="\n", max_tokens=64)
 
+"Extract unnormalized logprobs of utterance conditioned on each command."
 function extract_utterance_scores_per_command(trace::Trace, addr=:utterance)
     # Extract GPT-3 mixture trace over utterances
     utt_trace = trace.trie.leaf_nodes[addr].subtrace_or_retval
