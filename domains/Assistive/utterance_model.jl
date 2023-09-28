@@ -442,15 +442,21 @@ end
     actions, agents, predicates = extract_salient_actions(domain, state, plan)
     # Enumerate action commands
     commands = enumerate_commands(actions, agents, predicates)
-    # Construct prompts for each action command
+    # Construct prompts for each unique action command
     if isempty(commands)
         prompts = ["\n"]
+        probs = [1.0]
     else
-        prompts = map(commands) do command
-            construct_utterance_prompt(command, examples)
+        command_probs = proportionmap(commands) # Compute probabilities
+        prompts = String[]
+        probs = Float64[]
+        for (command, prob) in command_probs
+            prompt = construct_utterance_prompt(command, examples)
+            push!(prompts, prompt)
+            push!(probs, prob)
         end
     end
     # Sample utterance from GPT-3 mixture over prompts
-    utterance ~ gpt3_mixture(prompts)
+    utterance ~ gpt3_mixture(prompts, probs)
     return utterance
 end

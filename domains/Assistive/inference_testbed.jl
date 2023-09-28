@@ -195,7 +195,7 @@ if :utterance in MODALITIES
 end
 
 # Construct callback for logging data and visualizing inference
-renderer = get(renderer_dict, assist_type, renderer)
+renderer = get(renderer_dict, assist_type, RENDERER)
 callback = DKGCombinedCallback(
     renderer, domain;
     goal_addr = goal_addr,
