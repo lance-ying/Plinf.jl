@@ -77,38 +77,104 @@ GoalManhattan(domain::Domain, state::State) =
 
 function compute(heuristic::GoalManhattan,
                  domain::Domain, state::State, spec::Specification)
-    goals = get_goal_terms(spec)
-    has_goals = [g for g in goals if g.name == :has]
+    goals = _decompose_goals(domain, state, spec)
     n_agents = length(heuristic.agents)
-    if spec isa MinActionCosts
-        noop_cost = spec.costs[:noop]
-    elseif spec isa MinPerAgentActionCosts
-        noop_cost = spec.costs[heuristic.agents[2].name][:noop]
-    else
-        noop_cost = 1
+    # Look up movement and no-op costs for each agent
+    move_costs = Float64[]
+    noop_costs = Float64[]
+    for agent in heuristic.agents
+        if has_action_cost(spec)
+            move_cost = minimum((:up, :down, :left, :right)) do act
+                get_action_cost(spec, Compound(act, Term[agent]))
+            end
+            noop_cost = get_action_cost(spec, Compound(:noop, Term[agent]))
+            push!(move_costs, move_cost)
+            push!(noop_costs, noop_cost)
+        else
+            push!(move_costs, 1.0)
+            push!(noop_costs, 1.0)
+        end
     end
-    dists = map(has_goals) do goal
+    dists = map(goals) do goal
         if state[goal] return 0 end
+        # Compute distance from focal agent to goal item
         agent, item = goal.args
+        agent_idx = findfirst(==(agent), heuristic.agents)
         item_loc = get_obj_loc(state, item; check_has=true)
         agent_loc = get_obj_loc(state, agent)
         agent_item_dist = sum(abs.(agent_loc .- item_loc))
+        # Compute minimum distance for other agents to pick up and pass item
         min_other_dist = Inf
-        for other in heuristic.agents
-            other == agent && continue
-            other_loc = get_obj_loc(state, other)
-            other_dist = agent_item_dist
+        for (other_idx, other) in enumerate(heuristic.agents)
+            # Skip focal agent
+            other == agent && continue 
+            # Skip if other agent cannot pick up item
+            state[Compound(:forbidden, Term[other, item])] && continue
+            # Add distance from item to focal agent
+            other_dist = agent_item_dist * minimum(move_costs)
+            # Add distance from other agent to item
             if !state[Compound(:has, Term[other, item])]
+                other_loc = get_obj_loc(state, other)
                 other_item_dist = sum(abs.(other_loc .- item_loc))
-                other_dist += other_item_dist * (n_agents - 1) + 1
+                other_dist += other_item_dist * move_costs[other_idx]
+                # Add costs of other agents' no-ops
+                for idx in 1:n_agents
+                    idx == other_idx && continue
+                    other_dist += other_item_dist * noop_costs[idx]
+                end
             end
             min_other_dist = min(min_other_dist, other_dist)
         end
-        agent_dist = agent_item_dist * (1 + noop_cost * (n_agents - 1))
+        # Compute movement cost for focal agent
+        agent_dist = agent_item_dist * move_costs[agent_idx]
+        # Add costs of other agents' no-ops
+        for other_idx in 1:n_agents
+            other_idx == agent_idx && continue
+            agent_dist += agent_item_dist * noop_costs[other_idx]
+        end
         return min(agent_dist, min_other_dist)
     end
-    min_dist = length(dists) > 0 ? minimum(dists) : 0
+    # Compute minimum distance to any goal
+    min_dist = length(dists) > 0 ? minimum(dists) : 0.0
     return min_dist
+end
+
+function _decompose_goals(domain::Domain, state::State, spec::Specification)
+    goals = get_goal_terms(spec)
+    if goals[1].name == Symbol("do-action") # Handle action goals
+        action = goals[1].args[1]
+        has_goals = Compound[]
+        if PDDL.is_ground(action)
+            ground_actions = [action]
+        else
+            constraints = goals[1].args[2]
+            substs = satisfiers(domain, state, constraints)
+            ground_actions = [PDDL.substitute(action, s) for s in substs]
+        end
+        for act in ground_actions
+            if act.name == :pickup
+                # Pickup cost is equivalent to cost of agent having the time
+                agent = act.args[1]
+                item = act.args[2]
+                push!(has_goals, Compound(:has, Term[agent, item]))
+            elseif action.name == :handover
+                # Handover cost is underestimated by assuming either agent has item
+                a1, a2 = act.args[1:2]
+                item = act.args[3]
+                push!(has_goals, Compound(:has, Term[a1, item]))
+                push!(has_goals, Compound(:has, Term[a2, item]))
+            elseif action.name == :unlock
+                # Unlock cost is underestimated by the cost of agent having the key
+                agent = act.args[1]
+                key = act.args[2]
+                push!(has_goals, Compound(:has, Term[agent, key]))
+            end
+        end
+        return has_goals
+    else # Handle regular goals
+        has_goals = Compound[g for g in goals if g.name == :has]
+        return has_goals
+    end
 end
 
 """
