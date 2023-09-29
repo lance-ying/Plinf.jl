@@ -164,7 +164,6 @@ function command_to_goals(
         # Extract variables and infer their types
         vars = Var[]
         types = Symbol[]
-        new_args = Term[]
         for arg in action.args
             arg isa Var || continue
             push!(vars, arg)                
@@ -172,17 +171,8 @@ function command_to_goals(
             push!(types, type)
         end
         # Replace speaker and listener names in action
-        new_args = map(action.args) do arg
-            if arg == pddl"(me)"
-                speaker
-            elseif arg == pddl"(you)"
-                listener
-            else
-                arg
-            end
-        end
+        action = pronouns_to_names(action; speaker, listener)
         # Convert action term to goal formula
-        action = Compound(action.name, new_args)
         goal = act_goal_map[action.name](action)
         if PDDL.is_ground(goal)
             return Term[goal]
@@ -201,27 +191,65 @@ function command_to_goals(
     return reduce(vcat, goals)
 end
 
-function replace_agent_names(
-    term::Compound;
-    speaker = pddl"(human)", listener = pddl"(robot)"
+"Replace speaker and listener names with pronouns."
+function names_to_pronouns(
+    command::ActionCommand; speaker = pddl"(human)", listener = pddl"(robot)"
+)
+    actions = map(command.actions) do act
+        names_to_pronouns(act; speaker, listener)
+    end
+    predicates = map(command.predicates) do pred
+        names_to_pronouns(pred; speaker, listener)
+    end
+    return ActionCommand(actions, predicates)
+end
+
+function names_to_pronouns(
+    term::Compound; speaker = pddl"(human)", listener = pddl"(robot)"
+)
+    new_args = map(term.args) do arg
+        if arg == speaker
+            pddl"(me)"
+        elseif arg == listener
+            pddl"(you)"
+        else
+            names_to_pronouns(arg; speaker, listener)
+        end
+    end
+    return Compound(term.name, new_args)
+end
+names_to_pronouns(term::Var; kwargs...) = term
+names_to_pronouns(term::Const; kwargs...) = term
+
+"Replace pronouns with speaker and listener names."
+function pronouns_to_names(
+    command::ActionCommand; speaker = pddl"(human)", listener = pddl"(robot)"
+)
+    actions = map(command.actions) do act
+        pronouns_to_names(act; speaker, listener)
+    end
+    predicates = map(command.predicates) do pred
+        pronouns_to_names(pred; speaker, listener)
+    end
+    return ActionCommand(actions, predicates)
+end
+
+function pronouns_to_names(
+    term::Compound; speaker = pddl"(human)", listener = pddl"(robot)"
 )
     new_args = map(term.args) do arg
         if arg == pddl"(me)"
             speaker
         elseif arg == pddl"(you)"
             listener
-        elseif arg == speaker
-            pddl"(me)"
-        elseif arg == listener
-            pddl"(you)"
         else
-            replace_agent_names(arg; speaker, listener)
+            pronouns_to_names(arg; speaker, listener)
         end
     end
     return Compound(term.name, new_args)
 end
-replace_agent_names(term::Var; speaker, listener) = term
-replace_agent_names(term::Const; speaker, listener) = term
+pronouns_to_names(term::Var; kwargs...) = term
+pronouns_to_names(term::Const; kwargs...) = term
 
 "Extract focal objects from an action command."
 function extract_focal_objects(
@@ -235,6 +263,27 @@ function extract_focal_objects(
         push!(objects, obj)
     end
     return unique!(objects)
+end
+
+"Extract focal objects from a plan that matches a lifted action command."
+function extract_focal_objects_from_plan(
+    command::ActionCommand, plan::AbstractVector{<:Term}
+)
+    focal_vars = extract_focal_objects(command)
+    focal_objs = Term[]
+    command = pronouns_to_names(command)
+    for cmd_act in command.actions
+        for act in plan
+            unifiers = PDDL.unify(cmd_act, act)
+            isnothing(unifiers) && continue
+            for var in focal_vars
+                if haskey(unifiers, var)
+                    push!(focal_objs, unifiers[var])
+                end
+            end
+        end
+    end
+    return unique!(focal_objs)
 end
 
 "Extract salient actions (with predicate modifiers) from a plan."
@@ -342,16 +391,7 @@ function enumerate_commands(
     commands = ActionCommand[]
     # Replace speaker and listener names in actions
     actions = map(actions) do act
-        args = map(act.args) do arg
-            if arg == speaker
-                pddl"(me)"
-            elseif arg == listener
-                pddl"(you)"
-            else
-                arg
-            end
-        end
-        return Compound(act.name, args)
+        names_to_pronouns(act; speaker, listener)
     end
     # Enumerate commands of increasing length
     max_commanded_actions = min(max_commanded_actions, length(actions))
