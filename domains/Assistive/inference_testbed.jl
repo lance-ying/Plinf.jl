@@ -140,29 +140,15 @@ end
 ## Determine assistance options for efficient literal listener ##
 
 assist_obj_type = assist_type == "keys" ? :key : :door
+planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^13)
 
 # Extract assistance option for most probable command
-top_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
 cmd_goals = command_to_goals(top_command)
-planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^13)
 sol = planner(domain, state, cmd_goals)
 top_assist_plan = collect(sol)
+focal_objs = extract_focal_objects_from_plan(top_command, top_assist_plan)
 
-focal_vars = extract_focal_objects(top_command)
-focal_objs = Const[]
-for cmd_act in top_command.actions
-    cmd_act = replace_agent_names(cmd_act)
-    for act in top_assist_plan
-        unifiers = PDDL.unify(cmd_act, act)
-        isnothing(unifiers) && continue
-        for var in focal_vars
-            if haskey(unifiers, var)
-                push!(focal_objs, unifiers[var])
-            end
-        end
-    end
-end
-
+top_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
 for obj in focal_objs
     PDDL.get_objtype(state, obj) == assist_obj_type || continue
     obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
@@ -172,6 +158,31 @@ end
 # Print assistance options for most probable command
 println("Assistance options for most probable command:")
 for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_probs)
+    @printf("%s : %.3f\n", obj, prob)
+end
+
+# Compute assistance options in expectation across all commands
+expected_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
+for (cmd, prob) in zip(commands, command_probs)
+    tmp_assist_probs = zeros(size(expected_assist_probs))
+    cmd_goals = command_to_goals(cmd)
+    sol = planner(domain, state, cmd_goals)
+    if sol isa NullSolution || sol.status != :success
+        continue
+    end
+    assist_plan = collect(sol)
+    focal_objs = extract_focal_objects_from_plan(cmd, assist_plan)
+    for obj in focal_objs
+        PDDL.get_objtype(state, obj) == assist_obj_type || continue
+        obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
+        tmp_assist_probs[obj_idx] += 1
+    end
+    expected_assist_probs .+= tmp_assist_probs .* prob
+end
+
+# Print assistance options in expectation across all commands
+println("Assistance options in expectation across all commands:")
+for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), expected_assist_probs)
     @printf("%s : %.3f\n", obj, prob)
 end
 
