@@ -80,13 +80,16 @@ command_scores = extract_utterance_scores_per_command(trace)
 # Compute posterior probability of each command
 command_probs = softmax(command_scores)
 
-# Get top 5 most probable commands
-top_command = commands[argmax(command_probs)]
-top_command_idxs = sortperm(command_scores, rev=true)[1:5]
+# Sort commands by probability
+perm = sortperm(command_scores, rev=true)
+commands = commands[perm]
+command_probs = command_probs[perm]
+command_scores = command_scores[perm]
+top_command = commands[1]
 
-# Print commands and their probabilities
+# Print top 5 commands and their probabilities
 println("Top 5 most probable commands:")
-for idx in top_command_idxs
+for idx in 1:5
     command_str = repr("text/plain", commands[idx])
     @printf("%.3f: %s\n", command_probs[idx], command_str)
 end
@@ -114,9 +117,21 @@ for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_prob
     @printf("%s : %.3f\n", obj, prob)
 end
 
-# Compute assistance options in expectation across all commands
+# Compute assistance options in expectation via systematic sampling
+n_samples = 50
+count = 0
+u = rand() / n_samples
+total_prob = 0.0
 expected_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
 for (cmd, prob) in zip(commands, command_probs)
+    count == n_samples && break
+    n_copies = 0
+    total_prob += prob
+    while u <= total_prob
+        n_copies += 1
+        count += 1
+        u += 1 / n_samples
+    end
     tmp_assist_probs = zeros(size(expected_assist_probs))
     g_commands = ground_command(cmd, domain, state)
     for g_cmd in g_commands
@@ -128,7 +143,7 @@ for (cmd, prob) in zip(commands, command_probs)
         end
     end
     tmp_assist_probs ./= length(g_commands)
-    expected_assist_probs .+= tmp_assist_probs .* prob
+    expected_assist_probs .+= tmp_assist_probs .* (n_copies / n_samples)
 end
 
 # Print assistance options in expectation across all commands
@@ -140,7 +155,7 @@ end
 ## Determine assistance options for efficient literal listener ##
 
 assist_obj_type = assist_type == "keys" ? :key : :door
-planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^13)
+cmd_planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^13)
 
 # Extract assistance option for most probable command
 cmd_goals = command_to_goals(top_command)
@@ -161,12 +176,24 @@ for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_prob
     @printf("%s : %.3f\n", obj, prob)
 end
 
-# Compute assistance options in expectation across all commands
+# Compute assistance options in expectation via systematic sampling
+n_samples = 50
+count = 0
+u = rand() / n_samples
+total_prob = 0.0    
 expected_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
 for (cmd, prob) in zip(commands, command_probs)
+    count == n_samples && break
+    n_copies = 0
+    total_prob += prob
+    while u <= total_prob
+        n_copies += 1
+        count += 1
+        u += 1 / n_samples
+    end
     tmp_assist_probs = zeros(size(expected_assist_probs))
     cmd_goals = command_to_goals(cmd)
-    sol = planner(domain, state, cmd_goals)
+    sol = cmd_planner(domain, state, cmd_goals)
     if sol isa NullSolution || sol.status != :success
         continue
     end
@@ -177,7 +204,7 @@ for (cmd, prob) in zip(commands, command_probs)
         obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
         tmp_assist_probs[obj_idx] += 1
     end
-    expected_assist_probs .+= tmp_assist_probs .* prob
+    expected_assist_probs .+= tmp_assist_probs .* (n_copies / n_samples)
 end
 
 # Print assistance options in expectation across all commands
