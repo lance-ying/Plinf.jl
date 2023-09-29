@@ -150,17 +150,33 @@ function ground_command(
 end
 
 "Convert an action command to a sequence of one or more action goals."
-function command_to_goals(command::ActionCommand)
+function command_to_goals(
+    command::ActionCommand;
+    speaker = pddl"(human)",
+    listener = pddl"(robot)"
+)
     goals = map(command.actions) do action
         # Extract variables and infer their types
         vars = Var[]
         types = Symbol[]
+        new_args = Term[]
         for arg in action.args
             arg isa Var || continue
-            push!(vars, arg)
+            push!(vars, arg)                
             type = Symbol(lowercase(string(arg.name)[1:end-1]))
             push!(types, type)
         end
+        # Replace speaker and listener names in action
+        new_args = map(action.args) do arg
+            if arg == pddl"(me)"
+                speaker
+            elseif arg == pddl"(you)"
+                listener
+            else
+                arg
+            end
+        end
+        action = Compound(action.name, new_args)
         # Find predicate constraints which include some variables
         constraints = filter(pred -> any(arg in vars for arg in pred.args),
                              command.predicates)
