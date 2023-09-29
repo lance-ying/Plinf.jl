@@ -1,0 +1,11 @@
+;I will get the vegetables from the fridge, can you get a knife?
+(takeout human cutleryfork1 cabinet4)
+(noop robot)
+(takeout human cutleryfork2 cabinet4)
+(noop robot)
+(takeout human cutleryfork3 cabinet4)
+(noop robot)
+(takeout human cutleryfork4 cabinet4)
+(noop robot)
+(takeout human cutleryknife1 cabinet4)
+(noop robot)
