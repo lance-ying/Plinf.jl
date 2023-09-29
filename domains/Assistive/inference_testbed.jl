@@ -51,6 +51,7 @@ assist_type = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[3]
 
 problem_id = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[1]
 problem = PROBLEMS[problem_id]
+true_goal = PDDL.get_goal(problem)
 
 # Compile domain for problem
 domain = get!(COMPILED_DOMAINS, problem_id) do
@@ -97,6 +98,9 @@ end
 ## Determine assistance options for naive literal listener ##
 
 assist_obj_type = assist_type == "keys" ? :key : :door
+cmd_planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^13)
+goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^13)
+plan_end_state = EndStateSimulator()(domain, state, plan)
 
 # Extract assistance option for most probable command
 top_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
@@ -116,6 +120,40 @@ println("Assistance options for most probable command:")
 for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_probs)
     @printf("%s : %.3f\n", obj, prob)
 end
+
+# Compute average plan completion costs for most probable command
+assist_cmd_plans = Vector{Term}[]
+assist_full_plans = Vector{Term}[]
+for cmd in top_ground_commands
+    # Compute plan that satisfies command
+    cmd_goals = command_to_goals(cmd)
+    cmd_sol = cmd_planner(domain, plan_end_state, cmd_goals)
+    if cmd_sol isa NullSolution || sol.status != :success
+        continue
+    end
+    cmd_plan = collect(cmd_sol)
+    push!(assist_cmd_plans, cmd_plan)
+    # Compute remainder that satifies human's true goal
+    cmd_end_state = EndStateSimulator()(domain, plan_end_state, cmd_plan)
+    goal_sol = goal_planner(domain, cmd_end_state, true_goal)
+    if goal_sol isa NullSolution || sol.status != :success
+        continue
+    end
+    goal_plan = collect(goal_sol)
+    full_plan = vcat(cmd_plan, goal_plan)
+    push!(assist_full_plans, full_plan)
+end
+assist_plan_lengths = length.(assist_full_plans)
+mean_assist_plan_length = mean(assist_plan_lengths)
+assist_human_costs = map(assist_full_plans) do plan
+    filter(act -> act.args[1] == pddl"(human)", plan) |> length
+end
+mean_assist_human_cost = mean(assist_human_costs)
+
+# Print average plan completion costs for most probable command
+println("Average plan completion costs for most probable command:")
+@printf("Mean assist plan length: %.2f\n", mean_assist_plan_length)
+@printf("Mean assist human cost: %.2f\n", mean_assist_human_cost)
 
 # Compute assistance options in expectation via systematic sampling
 n_samples = 50
@@ -156,10 +194,12 @@ end
 
 assist_obj_type = assist_type == "keys" ? :key : :door
 cmd_planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^13)
+goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^13)
+plan_end_state = EndStateSimulator()(domain, state, plan)
 
 # Extract assistance option for most probable command
 cmd_goals = command_to_goals(top_command)
-sol = planner(domain, state, cmd_goals)
+sol = cmd_planner(domain, plan_end_state, cmd_goals)
 top_assist_plan = collect(sol)
 focal_objs = extract_focal_objects_from_plan(top_command, top_assist_plan)
 
@@ -175,6 +215,22 @@ println("Assistance options for most probable command:")
 for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_probs)
     @printf("%s : %.3f\n", obj, prob)
 end
+
+# Compute plan completion costs for most probable command
+cmd_plan = top_assist_plan
+cmd_end_state = EndStateSimulator()(domain, plan_end_state, cmd_plan)
+goal_sol = goal_planner(domain, cmd_end_state, true_goal)
+goal_plan = collect(goal_sol)
+top_assist_full_plan = vcat(cmd_plan, goal_plan)
+
+top_assist_plan_length = length(top_assist_full_plan)
+top_assist_human_cost =
+    filter(act -> act.args[1] == pddl"(human)", top_assist_full_plan) |> length
+
+# Print plan completion costs for most probable command
+println("Plan completion costs for most probable command:")
+@printf("Top assist plan length: %d\n", top_assist_plan_length)
+@printf("Top assist human cost: %d\n", top_assist_human_cost)
 
 # Compute assistance options in expectation via systematic sampling
 n_samples = 50
@@ -193,7 +249,7 @@ for (cmd, prob) in zip(commands, command_probs)
     end
     tmp_assist_probs = zeros(size(expected_assist_probs))
     cmd_goals = command_to_goals(cmd)
-    sol = cmd_planner(domain, state, cmd_goals)
+    sol = cmd_planner(domain, plan_end_state, cmd_goals)
     if sol isa NullSolution || sol.status != :success
         continue
     end
