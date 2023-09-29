@@ -149,11 +149,16 @@ function ground_command(
     return g_commands
 end
 
-"Convert an action command to a sequence of one or more action goals."
+"Convert an action command to one or more goal formulas."
 function command_to_goals(
     command::ActionCommand;
     speaker = pddl"(human)",
-    listener = pddl"(robot)"
+    listener = pddl"(robot)",
+    act_goal_map = Dict(
+        :pickup => act -> Compound(:has, Term[act.args[1], act.args[2]]),
+        :handover => act -> Compound(:has, Term[act.args[2], act.args[3]]),
+        :unlock => act -> Compound(Symbol("unlocked-by"), Term[act.args[1], act.args[3]])
+    )
 )
     goals = map(command.actions) do action
         # Extract variables and infer their types
@@ -176,24 +181,54 @@ function command_to_goals(
                 arg
             end
         end
+        # Convert action term to goal formula
         action = Compound(action.name, new_args)
+        goal = act_goal_map[action.name](action)
+        if PDDL.is_ground(goal)
+            return Term[goal]
+        end
         # Find predicate constraints which include some variables
         constraints = filter(pred -> any(arg in vars for arg in pred.args),
                              command.predicates)
-        # Add type constraints
+        # Construct type constraints
         typeconds = Term[Compound(ty, Term[v]) for (ty, v) in zip(types, vars)]
-        constraints = append!(constraints, typeconds)
-        return ActionGoal(action, constraints)
+        typecond = length(typeconds) > 1 ?
+            Compound(:and, typeconds) : typeconds[1]
+        # Costruct existential quantifier
+        body = Compound(:and, pushfirst!(constraints, goal))
+        return Term[Compound(:exists, Term[typecond, body])]
     end
-    return goals
+    return reduce(vcat, goals)
 end
+
+function replace_agent_names(
+    term::Compound;
+    speaker = pddl"(human)", listener = pddl"(robot)"
+)
+    new_args = map(term.args) do arg
+        if arg == pddl"(me)"
+            speaker
+        elseif arg == pddl"(you)"
+            listener
+        elseif arg == speaker
+            pddl"(me)"
+        elseif arg == listener
+            pddl"(you)"
+        else
+            replace_agent_names(arg; speaker, listener)
+        end
+    end
+    return Compound(term.name, new_args)
+end
+replace_agent_names(term::Var; speaker, listener) = term
+replace_agent_names(term::Const; speaker, listener) = term
 
 "Extract focal objects from an action command."
 function extract_focal_objects(
     command::ActionCommand;
     obj_arg_idxs = Dict(:pickup => 2, :handover => 3, :unlock => 3)
 )
-    objects = Const[]
+    objects = Term[]
     for act in command.actions
         idx = obj_arg_idxs[act.name]
         obj = act.args[idx]

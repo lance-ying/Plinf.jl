@@ -12,6 +12,7 @@ include("utterance_model.jl")
 include("render.jl")
 include("callbacks.jl")
 
+PDDL.Arrays.@register()
 GLMakie.activate!(inline=false)
 
 ## Load domains, problems and plans ##
@@ -79,13 +80,99 @@ command_scores = extract_utterance_scores_per_command(trace)
 # Compute posterior probability of each command
 command_probs = softmax(command_scores)
 
-# Get top 5 commands most probable commands
+# Get top 5 most probable commands
+top_command = commands[argmax(command_probs)]
 top_command_idxs = sortperm(command_scores, rev=true)[1:5]
 
 # Print commands and their probabilities
+println("Top 5 most probable commands:")
 for idx in top_command_idxs
     command_str = repr("text/plain", commands[idx])
     @printf("%.3f: %s\n", command_probs[idx], command_str)
+end
+
+## Determine assistance options for naive literal listener ##
+
+assist_obj_type = assist_type == "keys" ? :key : :door
+
+# Extract assistance option for most probable command
+top_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
+top_ground_commands = ground_command(top_command, domain, state)
+for cmd in top_ground_commands
+    focal_objs = extract_focal_objects(cmd)
+    for obj in focal_objs
+        PDDL.get_objtype(state, obj) == assist_obj_type || continue
+        obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
+        top_assist_probs[obj_idx] += 1
+    end
+end
+top_assist_probs ./= length(top_ground_commands)
+
+# Print assistance options for most probable command
+println("Assistance options for most probable command:")
+for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_probs)
+    @printf("%s : %.3f\n", obj, prob)
+end
+
+# Compute assistance options in expectation across all commands
+expected_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
+for (cmd, prob) in zip(commands, command_probs)
+    tmp_assist_probs = zeros(size(expected_assist_probs))
+    g_commands = ground_command(cmd, domain, state)
+    for g_cmd in g_commands
+        focal_objs = extract_focal_objects(g_cmd)
+        for obj in focal_objs
+            PDDL.get_objtype(state, obj) == assist_obj_type || continue
+            obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
+            tmp_assist_probs[obj_idx] += 1
+        end
+    end
+    tmp_assist_probs ./= length(g_commands)
+    expected_assist_probs .+= tmp_assist_probs .* prob
+end
+
+# Print assistance options in expectation across all commands
+println("Assistance options in expectation across all commands:")
+for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), expected_assist_probs)
+    @printf("%s : %.3f\n", obj, prob)
+end
+
+## Determine assistance options for efficient literal listener ##
+
+assist_obj_type = assist_type == "keys" ? :key : :door
+
+# Extract assistance option for most probable command
+top_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
+cmd_goals = command_to_goals(top_command)
+planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^13)
+sol = planner(domain, state, cmd_goals)
+top_assist_plan = collect(sol)
+
+focal_vars = extract_focal_objects(top_command)
+focal_objs = Const[]
+for cmd_act in top_command.actions
+    cmd_act = replace_agent_names(cmd_act)
+    for act in top_assist_plan
+        unifiers = PDDL.unify(cmd_act, act)
+        isnothing(unifiers) && continue
+        for var in focal_vars
+            if haskey(unifiers, var)
+                push!(focal_objs, unifiers[var])
+            end
+        end
+    end
+end
+
+for obj in focal_objs
+    PDDL.get_objtype(state, obj) == assist_obj_type || continue
+    obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
+    top_assist_probs[obj_idx] += 1
+end
+
+# Print assistance options for most probable command
+println("Assistance options for most probable command:")
+for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_probs)
+    @printf("%s : %.3f\n", obj, prob)
 end
 
 ## Configure agent and world model ##
