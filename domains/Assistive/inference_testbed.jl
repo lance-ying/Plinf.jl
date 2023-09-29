@@ -51,7 +51,18 @@ assist_type = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[3]
 
 problem_id = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[1]
 problem = PROBLEMS[problem_id]
-true_goal = PDDL.get_goal(problem)
+
+# Determine true goal from completion
+completion = COMPLETIONS[plan_id]
+true_goal_obj = completion[end].args[2]
+true_goal = Compound(:has, Term[pddl"(human)", true_goal_obj])
+
+# Construct true goal specification
+action_costs = (
+    pickup=1.0, unlock=1.0, handover=1.0, 
+    up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
+)
+true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
 
 # Compile domain for problem
 domain = get!(COMPILED_DOMAINS, problem_id) do
@@ -127,7 +138,8 @@ assist_full_plans = Vector{Term}[]
 for cmd in top_ground_commands
     # Compute plan that satisfies command
     cmd_goals = command_to_goals(cmd)
-    cmd_sol = cmd_planner(domain, plan_end_state, cmd_goals)
+    cmd_goal_spec = MinActionCosts(cmd_goals, action_costs)
+    cmd_sol = cmd_planner(domain, plan_end_state, cmd_goal_spec)
     if cmd_sol isa NullSolution || sol.status != :success
         continue
     end
@@ -135,7 +147,7 @@ for cmd in top_ground_commands
     push!(assist_cmd_plans, cmd_plan)
     # Compute remainder that satifies human's true goal
     cmd_end_state = EndStateSimulator()(domain, plan_end_state, cmd_plan)
-    goal_sol = goal_planner(domain, cmd_end_state, true_goal)
+    goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
     if goal_sol isa NullSolution || sol.status != :success
         continue
     end
@@ -199,8 +211,9 @@ plan_end_state = EndStateSimulator()(domain, state, plan)
 
 # Extract assistance option for most probable command
 cmd_goals = command_to_goals(top_command)
-sol = cmd_planner(domain, plan_end_state, cmd_goals)
-top_assist_plan = collect(sol)
+cmd_goal_spec = MinActionCosts(cmd_goals, action_costs)
+sol = cmd_planner(domain, plan_end_state, cmd_goal_spec)
+top_assist_cmd_plan = collect(sol)
 focal_objs = extract_focal_objects_from_plan(top_command, top_assist_plan)
 
 top_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
@@ -217,9 +230,9 @@ for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_prob
 end
 
 # Compute plan completion costs for most probable command
-cmd_plan = top_assist_plan
+cmd_plan = top_assist_cmd_plan
 cmd_end_state = EndStateSimulator()(domain, plan_end_state, cmd_plan)
-goal_sol = goal_planner(domain, cmd_end_state, true_goal)
+goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
 goal_plan = collect(goal_sol)
 top_assist_full_plan = vcat(cmd_plan, goal_plan)
 
@@ -249,12 +262,13 @@ for (cmd, prob) in zip(commands, command_probs)
     end
     tmp_assist_probs = zeros(size(expected_assist_probs))
     cmd_goals = command_to_goals(cmd)
-    sol = cmd_planner(domain, plan_end_state, cmd_goals)
+    cmd_goal_spec = MinActionCosts(cmd_goals, action_costs)
+    sol = cmd_planner(domain, plan_end_state, cmd_goal_spec)
     if sol isa NullSolution || sol.status != :success
         continue
     end
-    assist_plan = collect(sol)
-    focal_objs = extract_focal_objects_from_plan(cmd, assist_plan)
+    assist_cmd_plan = collect(sol)
+    focal_objs = extract_focal_objects_from_plan(cmd, assist_cmd_plan)
     for obj in focal_objs
         PDDL.get_objtype(state, obj) == assist_obj_type || continue
         obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
