@@ -129,7 +129,6 @@ MODALITIES = (:action, :utterance)
 # Define possible goals
 goals = @pddl("(has human gem1)", "(has human gem2)",
               "(has human gem3)", "(has human gem4)")
-goal_idxs = collect(1:length(goals))
 goal_names = ["red", "yellow", "blue", "green"]
 
 # Define possible cost profiles

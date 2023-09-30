@@ -368,7 +368,7 @@ Configure the listener / assistant's model of the speaker / human principal.
 """
 function configure_pragmatic_speaker_model(
     domain::Domain, state::State,
-    goals::Vector{Term},
+    goals::AbstractVector{<:Term},
     cost_profiles;
     act_temperature = 1.0,
     modalities = (:utterance, :action),
@@ -408,6 +408,7 @@ function configure_pragmatic_speaker_model(
         goal_config = StaticGoalConfig(goal_prior),
         # Assume the agent refines its policy at every timestep
         replan_args = (
+            plan_at_init = true, # Plan at initial timestep
             prob_replan = 0, # Probability of replanning at each timestep
             prob_refine = 1.0, # Probability of refining solution at each timestep
             rand_budget = false # Search budget is fixed everytime
@@ -449,6 +450,7 @@ function pragmatic_goal_inference(
     listener = pddl"(robot)",
     modalities = (:utterance, :action),
     verbose = false,
+    goal_names = ["gem$i" for i in 1:n_goals],
     kwargs...
 )
     # Add do-operator to listener actions (all actions for utterance-only model)
@@ -506,7 +508,7 @@ function pragmatic_goal_inference(
     end
 
     # Configure SIPS particle filter
-    sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
+    sips = SIPS(model_config, resample_cond=:none, rejuv_cond=:none)
     # Run particle filter to perform online goal inference
     n_samples = length(init_strata)
     pf_state = sips(
@@ -581,12 +583,18 @@ function pragmatic_assistance_offline(
 )
     # Extract probabilities, specifications and policies from particle filter
     start_t = Plinf.get_model_timestep(pf)
+    model_config = Gen.get_args(pf.traces[1])[2]
     probs = get_norm_weights(pf)
     goal_specs = map(pf.traces) do trace
         trace[:init => :agent => :goal]
     end
+    if start_t == 0
+        pf = copy(pf)
+        argdiffs = (UnknownChange(), NoChange())
+        pf_update!(pf, (1, model_config), argdiffs, choicemap())
+    end
     policies = map(pf.traces) do trace 
-        copy(trace[:timestep => t => :agent => :plan].sol)
+        copy(trace[:timestep => max(start_t, 1) => :agent => :plan].sol)
     end
     heuristic = memoized(GoalManhattan())
     planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^16)
@@ -630,6 +638,17 @@ function pragmatic_assistance_offline(
         # Check if goal is satisfied
         if is_goal(true_goal_spec, domain, state)
             verbose && println("Goal satisfied at timestep $(t-start_t).")
+            break
+        end
+        # Check if last two actions were no-ops
+        if (length(assist_plan) >= 2 &&
+            assist_plan[end].name == :noop && assist_plan[end-1].name == :noop)
+            # Fill remaining plan with no-ops
+            while length(assist_plan) < (max_steps - start_t)
+                append!(assist_plan, assist_plan[end-1:end])
+            end
+            assist_plan = assist_plan[1:max_steps-start_t]
+            verbose && println("No-op loop detected, terminating early.")
             break
         end
     end
