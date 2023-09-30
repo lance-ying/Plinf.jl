@@ -43,7 +43,7 @@ PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 ## Set-up for specific plan and problem ##
 
 # Select plan and problem
-plan_id = "1.1.keys"
+plan_id = "2.1.keys"
 
 plan = PLANS[plan_id]
 utterances = UTTERANCES[plan_id]
@@ -123,7 +123,7 @@ expected_efficient_assist_results = literal_assistance_efficient(
 ## Configure agent and world model ##
 
 # Set options that vary across runs
-ACT_TEMPERATURE = 4.0
+ACT_TEMPERATURE = 1.0
 MODALITIES = (:action, :utterance)
 
 # Define possible goals
@@ -132,29 +132,67 @@ goals = @pddl("(has human gem1)", "(has human gem2)",
 goal_idxs = collect(1:length(goals))
 goal_names = ["red", "yellow", "blue", "green"]
 
+# Define possible cost profiles
+cost_profiles = [
+    ( # Equal cost profile
+        human = (
+            pickup=1.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        ),
+        robot = (
+            pickup=1.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        )
+    ),
+    ( # Human has higher cost for pickup
+        human = (
+            pickup=5.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        ),
+        robot = (
+            pickup=1.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        )
+    ),
+    ( # Robot has higher cost for unlock
+        human = (
+            pickup=1.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        ),
+        robot = (
+            pickup=1.0, unlock=5.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        )
+    ),
+    ( # Combination of the above
+        human = (
+            pickup=5.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        ),
+        robot = (
+            pickup=1.0, unlock=5.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        )
+    )
+]    
+
 # Define goal prior
 @gen function goal_prior()
     # Sample goal index
     goal ~ uniform_discrete(1, length(goals))
-    # Define action costs (TO-DO: add uncertainty over relative costs)
-    costs = (
-        human=(
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.5
-        ),
-        robot = (
-            pickup=1.0, unlock=2.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.5
-        )
-    )
+    # Sample action costs
+    cost_idx ~ uniform_discrete(1, length(cost_profiles))
+    costs = cost_profiles[cost_idx]
     # Construct goal specification
     spec = MinPerAgentActionCosts(Term[goals[goal]], costs)
     return spec
 end
 
-# Construct iterator over goal choicemaps for stratified sampling
+# Construct iterator over goals and cost profiles for stratified sampling
 goal_addr = :init => :agent => :goal => :goal
-goal_strata = choiceproduct((goal_addr, 1:length(goals)))
+cost_addr = :init => :agent => :goal => :cost_idx
+init_strata = choiceproduct((goal_addr, 1:length(goals)),
+                            (cost_addr, 1:length(cost_profiles)))
 
 # Configure planner
 heuristic = memoized(precomputed(GoalManhattan(), domain, state))
@@ -258,10 +296,10 @@ callback = DKGCombinedCallback(
 sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
 
 # Run particle filter to perform online goal inference
-n_samples = length(goal_strata)
+n_samples = length(init_strata)
 pf_state = sips(
     n_samples,  observations;
-    init_args=(init_strata=goal_strata,),
+    init_args=(init_strata=init_strata,),
     callback=callback
 );
 
@@ -269,3 +307,13 @@ pf_state = sips(
 goal_probs = callback.logger.data[:goal_probs]
 goal_probs = reduce(hcat, goal_probs)
 
+# Extract cost probabilities
+cost_probs = callback.logger.data[:cost_probs]
+cost_probs = reduce(hcat, cost_probs)
+
+## Compute pragmatic assistance options and plans ##
+
+pragmatic_assist_results = pragmatic_assistance_offline(
+    pf_state, domain, plan_end_state, true_goal_spec, assist_obj_type;
+    act_temperature = ACT_TEMPERATURE, verbose = true
+)

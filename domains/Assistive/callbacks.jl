@@ -31,6 +31,8 @@ function DKGCombinedCallback(
     goal_addr = :init => :agent => :goal => :goal,
     goal_names = ["(has gem1)", "(has gem2)", "(has gem3)"],
     goal_colors = PDDLViz.colorschemes[:vibrant][1:length(goal_names)],
+    cost_addr = :init => :agent => :goal => :cost_idx,
+    n_costs = 4,
     obs_trajectory = nothing,
     print_goal_probs::Bool = true,
     render::Bool = true,
@@ -48,6 +50,7 @@ function DKGCombinedCallback(
     callbacks[:logger] = DataLoggerCallback(
         t = (t, pf) -> t::Int,
         goal_probs = pf -> probvec(pf, goal_addr, 1:n_goals)::Vector{Float64},
+        cost_probs = pf -> probvec(pf, cost_addr, 1:n_costs)::Vector{Float64},
         lml_est = pf -> log_ml_estimate(pf)::Float64,
     )
     # Construct print callback
