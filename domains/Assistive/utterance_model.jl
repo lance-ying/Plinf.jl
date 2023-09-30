@@ -156,27 +156,42 @@ function command_to_goals(
     listener = pddl"(robot)",
     act_goal_map = Dict(
         :pickup => act -> Compound(:has, Term[act.args[1], act.args[2]]),
-        :handover => act -> Compound(:has, Term[act.args[2], act.args[3]]),
-        :unlock => act -> Compound(Symbol("unlocked-by"), Term[act.args[1], act.args[3]])
+        :handover => act -> Compound(:and,
+            [Compound(:has, Term[act.args[2], act.args[3]]),
+             Compound(Symbol("pickedup-by"), Term[act.args[1], act.args[3]])]
+        ),
+        :unlock => act -> Compound(:and, 
+            [Compound(Symbol("unlocked-by"), Term[act.args[1], act.args[3]]),
+             Compound(Symbol("unlocked-with"), Term[act.args[2], act.args[3]])]
+        )
     )
 )
-    goals = map(command.actions) do action
-        # Extract variables and infer their types
-        vars = Var[]
-        types = Symbol[]
-        for arg in action.args
+    # Extract variables and infer their types
+    vars = Var[]
+    types = Symbol[]
+    for act in command.actions
+        for arg in act.args
             arg isa Var || continue
-            push!(vars, arg)                
+            push!(vars, arg)
             type = Symbol(lowercase(string(arg.name)[1:end-1]))
             push!(types, type)
         end
-        # Replace speaker and listener names in action
+    end
+    # Convert each action to goal
+    goals = map(command.actions) do action
         action = pronouns_to_names(action; speaker, listener)
-        # Convert action term to goal formula
         goal = act_goal_map[action.name](action)
+        return PDDL.flatten_conjs(goal)        
         if PDDL.is_ground(goal)
-            return Term[goal]
+            return PDDL.flatten_conjs(goal)
         end
+        # Costruct existential quantifier
+        body = Compound(:and, pushfirst!(constraints, goal))
+        return Term[Compound(:exists, Term[typecond, body])]
+    end
+    goals = reduce(vcat, goals)
+    # Convert to existential quantifier if variables are present
+    if !isempty(vars)
         # Find predicate constraints which include some variables
         constraints = filter(pred -> any(arg in vars for arg in pred.args),
                              command.predicates)
@@ -184,11 +199,13 @@ function command_to_goals(
         typeconds = Term[Compound(ty, Term[v]) for (ty, v) in zip(types, vars)]
         typecond = length(typeconds) > 1 ?
             Compound(:and, typeconds) : typeconds[1]
-        # Costruct existential quantifier
-        body = Compound(:and, pushfirst!(constraints, goal))
-        return Term[Compound(:exists, Term[typecond, body])]
+        neqconds = Term[Compound(:not, [Compound(:(==), Term[vars[i], vars[j]])])
+        for i in eachindex(vars) for j in 1:i-1]
+        # Construct existential quantifier
+        body = Compound(:and, append!(goals, neqconds, constraints))
+        goals = [Compound(:exists, Term[typecond, body])]
     end
-    return reduce(vcat, goals)
+    return goals
 end
 
 "Replace speaker and listener names with pronouns."
@@ -491,7 +508,7 @@ function construct_utterance_prompt(command::ActionCommand, examples)
 end
 
 # Define GPT-3 mixture generative function
-gpt3_mixture = GPT3Mixture(model="curie", stop="\n", max_tokens=64)
+gpt3_mixture = GPT3Mixture(model="text-curie-001", stop="\n", max_tokens=64)
 
 "Extract unnormalized logprobs of utterance conditioned on each command."
 function extract_utterance_scores_per_command(trace::Trace, addr=:utterance)
