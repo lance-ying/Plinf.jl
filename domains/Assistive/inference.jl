@@ -13,10 +13,12 @@ include("utils.jl")
 include("plan_io.jl")
 include("utterance_model.jl")
 
+## Literal Assistant ##
+
 """
     literal_command_inference(domain, state, utterance)
 
-Literal listener inference for an `utterance` in a `domain` and environment 
+Runs literal listener inference for an `utterance` in a `domain` and environment 
 `state`. Returns a distribution over listener-directed commands that could
 have led to the utterance.
 """
@@ -352,6 +354,206 @@ function literal_assistance_efficient(
     )
 end
 
+## Pragmatic Assistant ##
+
+"""
+    configure_pragmatic_speaker_model(
+        domain, state, goals, cost_profiles;
+        act_temperature = 1.0,
+        modalities = (:utterance, :action),
+        max_nodes = 2^16
+    )
+
+Configure the listener / assistant's model of the speaker / human principal.
+"""
+function configure_pragmatic_speaker_model(
+    domain::Domain, state::State,
+    goals::Vector{Term},
+    cost_profiles;
+    act_temperature = 1.0,
+    modalities = (:utterance, :action),
+    max_nodes = 2^16,
+    kwargs...
+)
+    # Define goal prior
+    @gen function goal_prior()
+        # Sample goal index
+        goal ~ uniform_discrete(1, length(goals))
+        # Sample action costs
+        cost_idx ~ uniform_discrete(1, length(cost_profiles))
+        costs = cost_profiles[cost_idx]
+        # Construct goal specification
+        spec = MinPerAgentActionCosts(Term[goals[goal]], costs)
+        return spec
+    end
+
+    # Configure planner
+    heuristic = memoized(precomputed(GoalManhattan(), domain, state))
+    planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=max_nodes)
+
+    # Define communication and action configuration
+    act_config = BoltzmannActConfig(act_temperature)
+    if :utterance in modalities
+        act_config = CommunicativeActConfig(
+            act_config, # Assume some Boltzmann action noise
+            pragmatic_utterance_model, # Utterance model
+            (domain, planner) # Domain and planner are arguments to utterance model
+        )
+    end
+
+    # Define agent configuration
+    agent_config = AgentConfig(
+        domain, planner;
+        # Assume fixed goal over time
+        goal_config = StaticGoalConfig(goal_prior),
+        # Assume the agent refines its policy at every timestep
+        replan_args = (
+            prob_replan = 0, # Probability of replanning at each timestep
+            prob_refine = 1.0, # Probability of refining solution at each timestep
+            rand_budget = false # Search budget is fixed everytime
+        ),
+        act_config = act_config
+    )
+
+    # Configure world model with agent and environment configuration
+    world_config = WorldConfig(
+        agent_config = agent_config,
+        env_config = PDDLEnvConfig(domain, state),
+        obs_config = PerfectObsConfig()
+    )
+
+    return world_config
+end
+
+"""
+    pragmatic_goal_inference(
+        model_config, n_goals, n_costs,
+        actions, utterances, utterance_times;
+        modalities = (:utterance, :action),
+        verbose = false,
+        kwargs...
+    )
+
+Runs online pragmatic goal inference problem defined by `model_config` and the 
+observed `actions` and `utterances`. Returns the particle filter state, the
+distribution over goals, the distribution over cost profiles, and the log
+marginal likelihood estimate of the data.
+"""
+function pragmatic_goal_inference(
+    model_config::WorldConfig,
+    n_goals::Int, n_costs::Int,
+    actions::AbstractVector{<:Term},
+    utterances::AbstractVector{String},
+    utterance_times::AbstractVector{Int};
+    speaker = pddl"(human)",
+    listener = pddl"(robot)",
+    modalities = (:utterance, :action),
+    verbose = false,
+    kwargs...
+)
+    # Add do-operator to listener actions (all actions for utterance-only model)
+    obs_actions = map(actions) do act
+        :action ∉ modalities || act.args[1] == listener ? Plinf.do_op(act) : act
+    end
+    # Convert plan to action choicemaps
+    observations = act_choicemap_vec(obs_actions)
+    timesteps = collect(1:length(observations))
+    # Add utterances to choicemaps
+    if :utterance in modalities
+        # Set `speak` to false for all timesteps
+        for (t, obs) in zip(timesteps, observations)
+            obs[:timestep => t => :act => :speak] = false
+        end
+        # Add initial choice map
+        init_obs = choicemap((:init => :act => :speak, false))
+        pushfirst!(observations, init_obs)
+        pushfirst!(timesteps, 0)
+        # Constrain `speak` and `utterance` for each step where speech occurs
+        for (t, utt) in zip(utterance_times, utterances)
+            if t == 0
+                speak_addr = :init => :act => :speak
+                utterance_addr = :init => :act => :utterance => :output
+            else
+                speak_addr = :timestep => t => :act => :speak
+                utterance_addr = :timestep => t => :act => :utterance => :output
+            end
+            observations[t+1][speak_addr] = true
+            observations[t+1][utterance_addr] = utt
+        end
+    end
+
+    # Construct iterator over goals and cost profiles for stratified sampling
+    goal_addr = :init => :agent => :goal => :goal
+    cost_addr = :init => :agent => :goal => :cost_idx
+    init_strata = choiceproduct((goal_addr, 1:n_goals),
+                                (cost_addr, 1:n_costs))
+
+    # Construct logging and printing callbacks
+    logger_cb = DataLoggerCallback(
+        t = (t, pf) -> t::Int,
+        goal_probs = pf -> probvec(pf, goal_addr, 1:n_goals)::Vector{Float64},
+        cost_probs = pf -> probvec(pf, cost_addr, 1:n_costs)::Vector{Float64},
+        lml_est = pf -> log_ml_estimate(pf)::Float64,
+    )
+    print_cb = PrintStatsCallback(
+        (goal_addr, 1:n_goals);
+        header="t\t" * join(goal_names, "\t") * "\n"
+    )
+    if verbose
+        callback = CombinedCallback(logger=logger_cb, print=print_cb)
+    else
+        callback = CombinedCallback(logger=logger_cb)
+    end
+
+    # Configure SIPS particle filter
+    sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
+    # Run particle filter to perform online goal inference
+    n_samples = length(init_strata)
+    pf_state = sips(
+        n_samples,  observations;
+        init_args=(init_strata=init_strata,),
+        callback=callback
+    );
+
+    # Extract logged data
+    goal_probs_history = callback.logger.data[:goal_probs]
+    goal_probs_history = reduce(hcat, goal_probs_history)
+    goal_probs = goal_probs_history[:, end]
+    cost_probs_history = callback.logger.data[:cost_probs]
+    cost_probs_history = reduce(hcat, cost_probs_history)
+    cost_probs = cost_probs_history[:, end]
+    lml_est_history = callback.logger.data[:lml_est]
+    lml_est = lml_est_history[end]
+
+    return (
+        pf = pf_state,
+        goal_probs = goal_probs,
+        cost_probs = cost_probs,
+        lml_est = lml_est,
+        goal_probs_history = goal_probs_history,
+        cost_probs_history = cost_probs_history,
+        lml_est_history = lml_est_history
+    )
+end
+
+function pragmatic_goal_inference(
+    domain::Domain, state::State, goals::Vector{Term}, cost_profiles,
+    actions::AbstractVector{<:Term},
+    utterances::AbstractVector{String},
+    utterance_times::AbstractVector{Int};
+    kwargs...
+)
+    # Configure speaker model
+    model_config = configure_pragmatic_speaker_model(
+        domain, state, goals, cost_profiles; kwargs...
+    )
+    # Run goal inference
+    return pragmatic_goal_inference(
+        model_config, length(goals), length(cost_profiles),
+        actions, utterances, utterance_times; kwargs...
+    )
+end
+
 """
     pragmatic_assistance_offline(pf, domain, state, true_goal_spec,
                                  assist_obj_type; kwargs...)
@@ -362,8 +564,9 @@ each timestep via expected cost minimization, where the expectation is taken
 over goal specifications. Returns the distribution over assistance options,
 the assistive plan, and the expected cost of that plan.
 
-Assistance is offline, because the human speaker is assumed to follow the 
-above policy when simulating the future.
+Assistance is offline, because the human speaker is simulated to follow the 
+most probable action at each timestep, instead of being drawn from some 
+external policy.
 """
 function pragmatic_assistance_offline(
     pf::ParticleFilterState,
