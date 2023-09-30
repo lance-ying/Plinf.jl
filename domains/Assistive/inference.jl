@@ -351,3 +351,112 @@ function literal_assistance_efficient(
         sample_probs = sample_probs,
     )
 end
+
+"""
+    pragmatic_assistance_offline(pf, domain, state, true_goal_spec,
+                                 assist_obj_type; kwargs...)
+
+Offline pragmatic assistance model, given a particle filter belief state (`pf`)
+in a `domain` and environment `state`. Simulates the best action to take at
+each timestep via expected cost minimization, where the expectation is taken
+over goal specifications. Returns the distribution over assistance options,
+the assistive plan, and the expected cost of that plan.
+
+Assistance is offline, because the human speaker is assumed to follow the 
+above policy when simulating the future.
+"""
+function pragmatic_assistance_offline(
+    pf::ParticleFilterState,
+    domain::Domain, state::State,
+    true_goal_spec::Specification,
+    assist_obj_type::Symbol;
+    speaker = pddl"(human)",
+    listener = pddl"(robot)",
+    act_temperature = 1.0,
+    max_steps::Int = 100,
+    verbose::Bool = false
+)
+    # Extract probabilities, specifications and policies from particle filter
+    start_t = Plinf.get_model_timestep(pf)
+    probs = get_norm_weights(pf)
+    goal_specs = map(pf.traces) do trace
+        trace[:init => :agent => :goal]
+    end
+    policies = map(pf.traces) do trace 
+        copy(trace[:timestep => t => :agent => :plan].sol)
+    end
+    heuristic = memoized(GoalManhattan())
+    planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^16)
+    
+    # Iteratively take action that minimizes expected goal achievement cost
+    verbose && println("Planning future actions via pragmatic assistance...")
+    assist_plan = Term[]
+    for t in (start_t+1):max_steps
+        # Refine policies for each goal, starting from current state
+        for (policy, spec) in zip(policies, goal_specs)
+            policy = refine!(policy, planner, domain, state, spec)
+        end
+        # Compute Q-values / probabilities for each action
+        act_priorities = Dict{Term, Float64}()
+        for act in available(domain, state)
+            next_state = transition(domain, state, act)
+            act_priorities[act] = 0.0
+            agent = act.args[1]
+            no_op = Compound(:noop, Term[agent])
+            # Compute expected value / probability of action across goals
+            for (prob, policy, spec) in zip(probs, policies, goal_specs)
+                if agent == listener # Compute expected value of listener actions
+                    val = SymbolicPlanners.get_value(policy, state, act)
+                    if val == -Inf # Handle irreversible failures
+                        noop_cost = get_cost(spec, domain, state, no_op, state)
+                        act_cost = get_cost(spec, domain, state, act, next_state)
+                        val = -((max_steps - t) * noop_cost + act_cost)
+                    end
+                else # Compute marginal probability of speaker actions
+                    b_policy = BoltzmannPolicy(policy, act_temperature)
+                    val = SymbolicPlanners.get_action_prob(b_policy, state, act)
+                end
+                act_priorities[act] += prob * val
+            end
+        end
+        # Take action with highest priority
+        act = argmax(act_priorities)
+        push!(assist_plan, act)
+        state = transition(domain, state, act)
+        verbose && println("$(t-start_t)\t$(write_pddl(act))")
+        # Check if goal is satisfied
+        if is_goal(true_goal_spec, domain, state)
+            verbose && println("Goal satisfied at timestep $(t-start_t).")
+            break
+        end
+    end
+    assist_plan_cost = length(assist_plan)
+    verbose && @printf("Assist plan cost: %d\n", assist_plan_cost)
+    
+    # Extract assistance options
+    verbose && println("\nExtracting assistance options...")
+    assist_objs = PDDL.get_objects(state, assist_obj_type)
+    assist_objs = sort!(collect(assist_objs), by=string)
+    assist_option_probs = zeros(length(assist_objs))
+    listener_plan = filter(act -> act.args[1] == listener, assist_plan)
+    focal_objs = extract_focal_objects(listener_plan)
+    for obj in focal_objs
+        PDDL.get_objtype(state, obj) == assist_obj_type || continue
+        obj_idx = findfirst(==(obj), assist_objs)
+        assist_option_probs[obj_idx] += 1
+    end
+    if verbose
+        println("Option probabilities:")
+        for (obj, prob) in zip(assist_objs, assist_option_probs)
+            @printf("  %s: %.3f\n", obj, prob)
+        end
+        println()
+    end
+
+    return (
+        assist_objs = assist_objs,
+        assist_option_probs = assist_option_probs,
+        plan_cost = assist_plan_cost,
+        full_plan = assist_plan        
+    )
+end

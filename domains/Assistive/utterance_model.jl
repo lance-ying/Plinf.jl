@@ -251,18 +251,33 @@ end
 pronouns_to_names(term::Var; kwargs...) = term
 pronouns_to_names(term::Const; kwargs...) = term
 
-"Extract focal objects from an action command."
+"Extract focal objects from an action command or plan."
 function extract_focal_objects(
     command::ActionCommand;
     obj_arg_idxs = Dict(:pickup => 2, :handover => 3, :unlock => 3)
 )
     objects = Term[]
     for act in command.actions
+        act.name in keys(obj_arg_idxs) || continue
         idx = obj_arg_idxs[act.name]
         obj = act.args[idx]
         push!(objects, obj)
     end
     return unique!(objects)
+end
+
+function extract_focal_objects(
+    plan::AbstractVector{<:Term};
+    obj_arg_idxs = Dict(:pickup => 2, :handover => 3, :unlock => 3)
+)
+    focal_objs = Term[]
+    for act in plan
+        act.name in keys(obj_arg_idxs) || continue
+        idx = obj_arg_idxs[act.name]
+        obj = act.args[idx]
+        push!(focal_objs, obj)
+    end
+    return unique!(focal_objs)
 end
 
 "Extract focal objects from a plan that matches a lifted action command."
