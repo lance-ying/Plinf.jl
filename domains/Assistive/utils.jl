@@ -125,7 +125,7 @@ function compute(heuristic::GoalManhattan,
         end
     end
     dists = map(goals) do goal
-        if state[goal] return 0 end
+        if state[goal] return 0.0 end
         # Compute distance from focal agent to goal item
         agent, item = goal.args
         agent_idx = findfirst(==(agent), heuristic.agents)
@@ -135,6 +135,8 @@ function compute(heuristic::GoalManhattan,
         # Compute minimum distance for other agents to pick up and pass item
         min_other_dist = Inf
         for (other_idx, other) in enumerate(heuristic.agents)
+            # Skip if object is not an item
+            PDDL.get_objtype(state, item) == :door && continue
             # Skip focal agent
             other == agent && continue 
             # Skip if other agent cannot pick up item
@@ -170,9 +172,13 @@ end
 
 function _decompose_goals(domain::Domain, state::State, spec::Specification)
     goals = get_goal_terms(spec)
+    return _decompose_goals(domain, state, goals)
+end
+
+function _decompose_goals(domain::Domain, state::State, goals::AbstractVector{<:Term})
     if goals[1].name == Symbol("do-action") # Handle action goals
         action = goals[1].args[1]
-        has_goals = Compound[]
+        new_goals = Term[]
         if PDDL.is_ground(action)
             ground_actions = [action]
         else
@@ -185,24 +191,32 @@ function _decompose_goals(domain::Domain, state::State, spec::Specification)
                 # Pickup cost is equivalent to cost of agent having the time
                 agent = act.args[1]
                 item = act.args[2]
-                push!(has_goals, Compound(:has, Term[agent, item]))
+                push!(new_goals, Compound(:has, Term[agent, item]))
             elseif action.name == :handover
                 # Handover cost is underestimated by assuming either agent has item
                 a1, a2 = act.args[1:2]
                 item = act.args[3]
-                push!(has_goals, Compound(:has, Term[a1, item]))
-                push!(has_goals, Compound(:has, Term[a2, item]))
+                push!(new_goals, Compound(:has, Term[a1, item]))
+                push!(new_goals, Compound(:has, Term[a2, item]))
             elseif action.name == :unlock
                 # Unlock cost is underestimated by the cost of agent having the key
                 agent = act.args[1]
                 key = act.args[2]
-                push!(has_goals, Compound(:has, Term[agent, key]))
+                push!(new_goals, Compound(:has, Term[agent, key]))
             end
         end
-        return has_goals
+        return new_goals
     else # Handle regular goals
-        has_goals = Compound[g for g in goals if g.name == :has]
-        return has_goals
+        new_goals = Term[]
+        for goal in goals
+            if goal.name in (:has, Symbol("unlocked-by"))
+                push!(new_goals, goal)
+            elseif goal.name in (:and, :or)
+                subgoals = _decompose_goals(domain, state, goal.args)
+                append!(new_goals, subgoals)
+            end
+        end
+        return unique!(new_goals)
     end
 end
 
