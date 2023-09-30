@@ -102,8 +102,8 @@ MODALITIES = [
 MAX_STEPS = 100
 
 # Number of samples for systematic sampling
-N_LITERAL_NAIVE_SAMPLES = 5
-N_LITERAL_EFFICIENT_SAMPLES = 50
+N_LITERAL_NAIVE_SAMPLES = 10
+N_LITERAL_EFFICIENT_SAMPLES = 10
 
 # Whether to run literal or pragmatic inference
 RUN_LITERAL = true
@@ -147,12 +147,13 @@ df_path = "experiments_$(datetime).csv"
 df_path = joinpath(@__DIR__, df_path)
 
 # Iterate over plans
-for plan_id in PLAN_IDS
+for plan_id in PLAN_IDS[3:end]
     println("=== Plan $plan_id ===")
     # Load plan and problem
     plan = PLANS[plan_id]
     utterances = UTTERANCES[plan_id]
     utterance_times = UTTERANCE_TIMES[plan_id]
+    println(utterances)
 
     assist_type = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[3]
     assist_obj_type = assist_type == "keys" ? :key : :door
@@ -169,6 +170,13 @@ for plan_id in PLAN_IDS
     action_costs = COST_PROFILES[1][1]
     true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
 
+    # Sellect cost profiles based on assistance type
+    if assist_type == "doors"
+        cost_profiles = COST_PROFILES[2:2]
+    elseif assist_type == "keys"
+        cost_profiles = COST_PROFILES[4:4]
+    end
+
     # Compile domain for problem
     domain = get!(COMPILED_DOMAINS, problem_id) do
         println("Compiling domain for problem $problem_id...")
@@ -181,6 +189,7 @@ for plan_id in PLAN_IDS
     state = initstate(domain, problem)
     # Simulate plan to completion
     plan_end_state = EndStateSimulator()(domain, state, plan)
+    remain_steps = MAX_STEPS - length(plan)
 
     # Construct plan entry for dataframe
     plan_entry = Dict{Symbol, Any}(
@@ -207,6 +216,10 @@ for plan_id in PLAN_IDS
             @printf("%.3f: %s\n", command_probs[idx], command_str)
         end
 
+        # Set up planners
+        cmd_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16)
+        goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16)
+
         # Set up dataframe entry        
         entry = copy(plan_entry)
         entry[:infer_method] = "literal"
@@ -218,9 +231,10 @@ for plan_id in PLAN_IDS
         end
 
         # Compute naive assistance options and plans for top command
+        println()
         top_naive_assist_results = literal_assistance_naive(
             top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
-            verbose = true
+            cmd_planner, goal_planner, max_steps = remain_steps, verbose = true
         )
         entry[:assist_method] = "naive"
         entry[:estim_type] = "mode"
@@ -232,9 +246,11 @@ for plan_id in PLAN_IDS
         push!(df, entry, cols=:union)
 
         # Compute expected assistance options and plans via systematic sampling
+        println()
         mean_naive_assist_results = literal_assistance_naive(
             commands, command_probs,
             domain, plan_end_state, true_goal_spec, assist_obj_type;
+            cmd_planner, goal_planner, max_steps = remain_steps,
             verbose = true, n_samples = N_LITERAL_NAIVE_SAMPLES
         )
         entry[:estim_type] = "mean"
@@ -246,9 +262,10 @@ for plan_id in PLAN_IDS
         push!(df, entry, cols=:union)
 
         # Compute efficient assistance options and plans for top command
+        println()
         top_efficient_assist_results = literal_assistance_efficient(
             top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
-            verbose = true
+            cmd_planner, goal_planner, max_steps = remain_steps, verbose = true
         )
         entry[:assist_method] = "efficient"
         entry[:estim_type] = "mode"
@@ -261,9 +278,11 @@ for plan_id in PLAN_IDS
         push!(df, entry, cols=:union)
 
         # Compute expected assistance options and plans via systematic sampling
+        println()
         mean_efficient_assist_results = literal_assistance_efficient(
             commands, command_probs,
             domain, plan_end_state, true_goal_spec, assist_obj_type;
+            cmd_planner, goal_planner, max_steps = remain_steps,
             verbose = true, n_samples = N_LITERAL_EFFICIENT_SAMPLES
         )
         entry[:estim_type] = "mean"
@@ -274,6 +293,7 @@ for plan_id in PLAN_IDS
         end
         push!(df, entry, cols=:union)
 
+        GC.gc()
         CSV.write(df_path, df)
     end
 
@@ -293,66 +313,74 @@ for plan_id in PLAN_IDS
         end
 
         # Iterate over modalities and parameters
-        for modalities in MODALITIES, act_temperature in ACT_TEMPERATURES
-            println("Modalities: $modalities")
+        for act_temperature in ACT_TEMPERATURES
+            println()
             println("Action temperature: $act_temperature")
-            entry[:modalities] = join(collect(modalities), ", ")
             entry[:act_temperature] = act_temperature
-
-            infer_init_state = :action ∉ modalities ? plan_end_state : state
 
             # Configure pragmatic speaker/agent model
             model_config = configure_pragmatic_speaker_model(
-                domain, infer_init_state, GOALS, COST_PROFILES;
-                modalities, act_temperature
+                domain, state, GOALS, cost_profiles;
+                modalities=(:action, :utterance), act_temperature
             )
 
             # Run goal inference
             println()
             println("Running pragmatic goal inference...")
-            if :action ∉ modalities
-                pragmatic_inference_results = pragmatic_goal_inference(
-                    model_config, length(GOALS), length(COST_PROFILES),
-                    Term[], utterances[1:1], [0],
-                    verbose = true
-                )
-            else
-                pragmatic_inference_results = pragmatic_goal_inference(
-                    model_config, length(GOALS), length(COST_PROFILES),
-                    plan, utterances, utterance_times,
-                    verbose = true
-                )
-            end
-            pf = pragmatic_inference_results.pf
-
-            # Store inference results
-            goal_probs = pragmatic_inference_results.goal_probs
-            for (i, p) in enumerate(goal_probs)
-                entry[Symbol("goal_probs_$i")] = p
-            end
-            true_goal_idx = findfirst(==(true_goal), GOALS)
-            entry[:true_goal_probs] = goal_probs[true_goal_idx]
-            entry[:brier_score] =
-                sum((goal_probs .- (1:length(GOALS) .== true_goal_idx)).^2)
-            entry[:lml_est] = pragmatic_inference_results.lml_est
-
-            # Compute pragmatic assistance options and plans
-            println()
-            println("Running pragmatic goal assistance...")
-            pragmatic_assist_results = pragmatic_assistance_offline(
-                pf, domain, plan_end_state,
-                true_goal_spec, assist_obj_type;
-                verbose = true, max_steps = MAX_STEPS, 
-                act_temperature
+            pragmatic_inference_results = pragmatic_goal_inference(
+                model_config, length(GOALS), length(cost_profiles),
+                plan, utterances, utterance_times,
+                verbose = true
             )
-            entry[:assist_plan] =
-                join(write_pddl.(pragmatic_assist_results.full_plan), "\n")
-            entry[:assist_plan_cost] = pragmatic_assist_results.plan_cost
-            for (i, p) in enumerate(pragmatic_assist_results.assist_option_probs)
-                entry[Symbol("assist_probs_$i")] = p
+
+            for modalities in MODALITIES
+                println()
+                println("Modalities: $modalities")
+                entry[:modalities] = join(collect(modalities), ", ")
+
+                # Store inference results
+                goal_probs = if modalities == (:action,)
+                    pragmatic_inference_results.action_goal_probs
+                elseif modalities == (:utterance,)
+                    pragmatic_inference_results.utterance_goal_probs
+                elseif modalities == (:action, :utterance)
+                    pragmatic_inference_results.goal_probs
+                end
+                for (i, p) in enumerate(goal_probs)
+                    entry[Symbol("goal_probs_$i")] = p
+                end
+                true_goal_idx = findfirst(==(true_goal), GOALS)
+                entry[:true_goal_probs] = goal_probs[true_goal_idx]
+                entry[:brier_score] =
+                    sum((goal_probs .- (1:length(GOALS) .== true_goal_idx)).^2)
+                entry[:lml_est] = pragmatic_inference_results.lml_est
+
+                # Compute pragmatic assistance options and plans
+                println("Running pragmatic goal assistance...")
+                pf = copy(pragmatic_inference_results.pf)
+                if modalities == (:action,)
+                    pf.log_weights .=
+                        pragmatic_inference_results.action_trace_scores
+                elseif modalities == (:utterance,)
+                    pf.log_weights .=
+                        pragmatic_inference_results.utterance_trace_scores
+                end
+                pragmatic_assist_results = pragmatic_assistance_offline(
+                    pf, domain, plan_end_state,
+                    true_goal_spec, assist_obj_type;
+                    verbose = true, max_steps = MAX_STEPS, 
+                    act_temperature
+                )
+                entry[:assist_plan] =
+                    join(write_pddl.(pragmatic_assist_results.full_plan), "\n")
+                entry[:assist_plan_cost] = pragmatic_assist_results.plan_cost
+                for (i, p) in enumerate(pragmatic_assist_results.assist_option_probs)
+                    entry[Symbol("assist_probs_$i")] = p
+                end
+                push!(df, entry, cols=:union)
+                CSV.write(df_path, df)
             end
-            push!(df, entry, cols=:union)
-            CSV.write(df_path, df)
+            GC.gc()
         end
     end
 end

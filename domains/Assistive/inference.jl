@@ -79,9 +79,9 @@ function literal_assistance_naive(
     assist_obj_type::Symbol;
     speaker = pddl"(human)",
     listener = pddl"(robot)",
-    failure_cost = 100,
-    cmd_planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^14),
-    goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^14),
+    max_steps = 100,
+    cmd_planner = AStarPlanner(GoalManhattan(), max_nodes=2^15),
+    goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16),
     verbose::Bool = false
 )
     # Compute assistance options, averaged over possible groundings
@@ -131,7 +131,7 @@ function literal_assistance_naive(
             state : EndStateSimulator()(domain, state, cmd_plan)
         goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
         if goal_sol isa NullSolution || goal_sol.status != :success
-            goal_plan = fill(PDDL.no_op, failure_cost - length(cmd_plan))
+            goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
             verbose && println("No plan found.")
         else
             goal_plan = collect(goal_sol)
@@ -229,9 +229,9 @@ function literal_assistance_efficient(
     assist_obj_type::Symbol;
     speaker = pddl"(human)",
     listener = pddl"(robot)",
-    failure_cost = 100,
-    cmd_planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^14),
-    goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^14),
+    max_steps = 100,
+    cmd_planner = AStarPlanner(GoalManhattan(), max_nodes=2^15),
+    goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16),
     verbose::Bool = false
 )
     # Compute plan that satisfies command
@@ -253,13 +253,12 @@ function literal_assistance_efficient(
         state : EndStateSimulator()(domain, state, cmd_plan)
     goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
     if goal_sol isa NullSolution || goal_sol.status != :success
-        goal_plan = fill(PDDL.no_op, failure_cost - length(cmd_plan))
+        goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
         verbose && println("No plan found.")
     else
         goal_plan = collect(goal_sol)
         verbose && println("Plan found: $(length(goal_plan)) actions")
     end
-    goal_plan = collect(goal_sol)
     full_plan = Term[cmd_plan; goal_plan]
     verbose && println()
     
@@ -460,7 +459,13 @@ function pragmatic_goal_inference(
     # Convert plan to action choicemaps
     observations = act_choicemap_vec(obs_actions)
     timesteps = collect(1:length(observations))
+    # Construct selection containing all action addresses
+    action_sel = Gen.select()
+    for t in timesteps
+        push!(action_sel, :timestep => t => :act => :act)
+    end
     # Add utterances to choicemaps
+    utterance_sel = Gen.select()
     if :utterance in modalities
         # Set `speak` to false for all timesteps
         for (t, obs) in zip(timesteps, observations)
@@ -481,6 +486,8 @@ function pragmatic_goal_inference(
             end
             observations[t+1][speak_addr] = true
             observations[t+1][utterance_addr] = utt
+            push!(utterance_sel, speak_addr)
+            push!(utterance_sel, utterance_addr)
         end
     end
 
@@ -496,6 +503,30 @@ function pragmatic_goal_inference(
         goal_probs = pf -> probvec(pf, goal_addr, 1:n_goals)::Vector{Float64},
         cost_probs = pf -> probvec(pf, cost_addr, 1:n_costs)::Vector{Float64},
         lml_est = pf -> log_ml_estimate(pf)::Float64,
+        action_goal_probs = pf -> begin
+            tr_scores = map(pf.traces) do trace
+                project(trace, action_sel)
+            end
+            tr_probs = softmax(tr_scores)
+            probs = zeros(n_goals)
+            for (idx, tr) in enumerate(pf.traces)
+                goal = tr[goal_addr]
+                probs[goal] += tr_probs[idx]
+            end
+            return probs
+        end,
+        utterance_goal_probs = pf -> begin
+            tr_scores = map(pf.traces) do trace
+                project(trace, utterance_sel)
+            end
+            tr_probs = softmax(tr_scores)
+            probs = zeros(n_goals)
+            for (idx, tr) in enumerate(pf.traces)
+                goal = tr[goal_addr]
+                probs[goal] += tr_probs[idx]
+            end
+            return probs
+        end
     )
     print_cb = PrintStatsCallback(
         (goal_addr, 1:n_goals);
@@ -526,14 +557,34 @@ function pragmatic_goal_inference(
     cost_probs = cost_probs_history[:, end]
     lml_est_history = callback.logger.data[:lml_est]
     lml_est = lml_est_history[end]
+    action_goal_probs_history = callback.logger.data[:action_goal_probs]
+    action_goal_probs_history = reduce(hcat, action_goal_probs_history)
+    action_goal_probs = action_goal_probs_history[:, end]
+    utterance_goal_probs_history = callback.logger.data[:utterance_goal_probs]
+    utterance_goal_probs_history = reduce(hcat, utterance_goal_probs_history)
+    utterance_goal_probs = utterance_goal_probs_history[:, end]
+
+    # Extract trace scores for specific modalities
+    action_trace_scores = map(pf_state.traces) do trace
+        project(trace, action_sel)
+    end
+    utterance_trace_scores = map(pf_state.traces) do trace
+        project(trace, utterance_sel)
+    end
 
     return (
         pf = pf_state,
         goal_probs = goal_probs,
         cost_probs = cost_probs,
+        action_goal_probs = action_goal_probs,
+        utterance_goal_probs = utterance_goal_probs,
+        action_trace_scores = action_trace_scores,
+        utterance_trace_scores = utterance_trace_scores,
         lml_est = lml_est,
         goal_probs_history = goal_probs_history,
         cost_probs_history = cost_probs_history,
+        action_goal_probs_history = action_goal_probs_history,
+        utterance_goal_probs_history = utterance_goal_probs_history,
         lml_est_history = lml_est_history
     )
 end
@@ -567,8 +618,8 @@ over goal specifications. Returns the distribution over assistance options,
 the assistive plan, and the expected cost of that plan.
 
 Assistance is offline, because the human speaker is simulated to follow the 
-most probable action at each timestep, instead of being drawn from some 
-external policy.
+policies corresponding to the true goal, instead of following some external
+policy.
 """
 function pragmatic_assistance_offline(
     pf::ParticleFilterState,
@@ -579,6 +630,7 @@ function pragmatic_assistance_offline(
     listener = pddl"(robot)",
     act_temperature = 1.0,
     max_steps::Int = 100,
+    p_thresh::Float64 = 0.001,
     verbose::Bool = false
 )
     # Extract probabilities, specifications and policies from particle filter
@@ -604,7 +656,8 @@ function pragmatic_assistance_offline(
     assist_plan = Term[]
     for t in (start_t+1):max_steps
         # Refine policies for each goal, starting from current state
-        for (policy, spec) in zip(policies, goal_specs)
+        for (prob, policy, spec) in zip(probs, policies, goal_specs)
+            prob < p_thresh && continue # Ignore low-probability goals
             policy = refine!(policy, planner, domain, state, spec)
         end
         # Compute Q-values / probabilities for each action
@@ -616,16 +669,21 @@ function pragmatic_assistance_offline(
             no_op = Compound(:noop, Term[agent])
             # Compute expected value / probability of action across goals
             for (prob, policy, spec) in zip(probs, policies, goal_specs)
-                if agent == listener # Compute expected value of listener actions
+                prob < p_thresh && continue # Ignore low-probability goals
+                if agent == listener
+                    # Compute expected value of listener actions
                     val = SymbolicPlanners.get_value(policy, state, act)
                     if val == -Inf # Handle irreversible failures
                         noop_cost = get_cost(spec, domain, state, no_op, state)
                         act_cost = get_cost(spec, domain, state, act, next_state)
                         val = -((max_steps - t) * noop_cost + act_cost)
                     end
-                else # Compute marginal probability of speaker actions
+                elseif get_goal_terms(true_goal_spec) == get_goal_terms(spec)
+                    # Compute probability of speaker actions under true goal
                     b_policy = BoltzmannPolicy(policy, act_temperature)
                     val = SymbolicPlanners.get_action_prob(b_policy, state, act)
+                else
+                    val = 0.0
                 end
                 act_priorities[act] += prob * val
             end
