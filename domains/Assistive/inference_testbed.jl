@@ -9,6 +9,7 @@ using GenParticleFilters: softmax
 include("utils.jl")
 include("plan_io.jl")
 include("utterance_model.jl")
+include("inference.jl")
 include("render.jl")
 include("callbacks.jl")
 
@@ -42,12 +43,14 @@ PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 ## Set-up for specific plan and problem ##
 
 # Select plan and problem
-plan_id = "2.1.keys"
+plan_id = "1.1.keys"
 
 plan = PLANS[plan_id]
 utterances = UTTERANCES[plan_id]
 utterance_times = UTTERANCE_TIMES[plan_id]
+
 assist_type = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[3]
+assist_obj_type = assist_type == "keys" ? :key : :door
 
 problem_id = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[1]
 problem = PROBLEMS[problem_id]
@@ -74,29 +77,14 @@ end
 # Construct initial state
 state = initstate(domain, problem)
 
+# Simulate plan to completion
+plan_end_state = EndStateSimulator()(domain, state, plan)
+
 ## Run literal listener inference ##
 
-# Enumerate over robot-directed commands
-actions, agents, predicates = enumerate_salient_actions(domain, state)
-commands = enumerate_commands(actions, agents, predicates)
-commands = lift_command.(commands, [state])
-unique!(commands)
-
-# Generate constrained trace from literal listener model
-choices = choicemap((:utterance => :output, utterances[1]))
-trace, _ = generate(literal_utterance_model, (domain, state, commands), choices)
-
-# Extract unnormalized log-probabilities of utterance conditioned on each command
-command_scores = extract_utterance_scores_per_command(trace)
-
-# Compute posterior probability of each command
-command_probs = softmax(command_scores)
-
-# Sort commands by probability
-perm = sortperm(command_scores, rev=true)
-commands = commands[perm]
-command_probs = command_probs[perm]
-command_scores = command_scores[perm]
+# Infer distribution over commands
+commands, command_probs, command_scores =
+    literal_command_inference(domain, plan_end_state, utterances[1], verbose=true)
 top_command = commands[1]
 
 # Print top 5 commands and their probabilities
@@ -106,182 +94,31 @@ for idx in 1:5
     @printf("%.3f: %s\n", command_probs[idx], command_str)
 end
 
-## Determine assistance options for naive literal listener ##
+# Compute naive assistance options and plans for top command
+top_naive_assist_results = literal_assistance_naive(
+    top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
+    verbose = true
+)
 
-assist_obj_type = assist_type == "keys" ? :key : :door
-cmd_planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^13)
-goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^13)
-plan_end_state = EndStateSimulator()(domain, state, plan)
+# Compute expected assistance options and plans via systematic sampling
+expected_naive_assist_results = literal_assistance_naive(
+    commands, command_probs,
+    domain, plan_end_state, true_goal_spec, assist_obj_type;
+    verbose = true, n_samples = 5
+)
 
-# Extract assistance option for most probable command
-top_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
-top_ground_commands = ground_command(top_command, domain, state)
-for cmd in top_ground_commands
-    focal_objs = extract_focal_objects(cmd)
-    for obj in focal_objs
-        PDDL.get_objtype(state, obj) == assist_obj_type || continue
-        obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
-        top_assist_probs[obj_idx] += 1
-    end
-end
-top_assist_probs ./= length(top_ground_commands)
+# Compute efficient assistance options and plans for top command
+top_efficient_assist_results = literal_assistance_efficient(
+    top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
+    verbose = true
+)
 
-# Print assistance options for most probable command
-println("Assistance options for most probable command:")
-for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_probs)
-    @printf("%s : %.3f\n", obj, prob)
-end
-
-# Compute average plan completion costs for most probable command
-assist_cmd_plans = Vector{Term}[]
-assist_full_plans = Vector{Term}[]
-for cmd in top_ground_commands
-    # Compute plan that satisfies command
-    cmd_goals = command_to_goals(cmd)
-    cmd_goal_spec = MinActionCosts(cmd_goals, action_costs)
-    cmd_sol = cmd_planner(domain, plan_end_state, cmd_goal_spec)
-    if cmd_sol isa NullSolution || sol.status != :success
-        continue
-    end
-    cmd_plan = collect(cmd_sol)
-    push!(assist_cmd_plans, cmd_plan)
-    # Compute remainder that satifies human's true goal
-    cmd_end_state = EndStateSimulator()(domain, plan_end_state, cmd_plan)
-    goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
-    if goal_sol isa NullSolution || sol.status != :success
-        continue
-    end
-    goal_plan = collect(goal_sol)
-    full_plan = vcat(cmd_plan, goal_plan)
-    push!(assist_full_plans, full_plan)
-end
-assist_plan_lengths = length.(assist_full_plans)
-mean_assist_plan_length = mean(assist_plan_lengths)
-assist_human_costs = map(assist_full_plans) do plan
-    filter(act -> act.args[1] == pddl"(human)", plan) |> length
-end
-mean_assist_human_cost = mean(assist_human_costs)
-
-# Print average plan completion costs for most probable command
-println("Average plan completion costs for most probable command:")
-@printf("Mean assist plan length: %.2f\n", mean_assist_plan_length)
-@printf("Mean assist human cost: %.2f\n", mean_assist_human_cost)
-
-# Compute assistance options in expectation via systematic sampling
-n_samples = 50
-count = 0
-u = rand() / n_samples
-total_prob = 0.0
-expected_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
-for (cmd, prob) in zip(commands, command_probs)
-    count == n_samples && break
-    n_copies = 0
-    total_prob += prob
-    while u <= total_prob
-        n_copies += 1
-        count += 1
-        u += 1 / n_samples
-    end
-    tmp_assist_probs = zeros(size(expected_assist_probs))
-    g_commands = ground_command(cmd, domain, state)
-    for g_cmd in g_commands
-        focal_objs = extract_focal_objects(g_cmd)
-        for obj in focal_objs
-            PDDL.get_objtype(state, obj) == assist_obj_type || continue
-            obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
-            tmp_assist_probs[obj_idx] += 1
-        end
-    end
-    tmp_assist_probs ./= length(g_commands)
-    expected_assist_probs .+= tmp_assist_probs .* (n_copies / n_samples)
-end
-
-# Print assistance options in expectation across all commands
-println("Assistance options in expectation across all commands:")
-for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), expected_assist_probs)
-    @printf("%s : %.3f\n", obj, prob)
-end
-
-## Determine assistance options for efficient literal listener ##
-
-assist_obj_type = assist_type == "keys" ? :key : :door
-cmd_planner = AStarPlanner(GoalCountHeuristic(), max_nodes=2^13)
-goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^13)
-plan_end_state = EndStateSimulator()(domain, state, plan)
-
-# Extract assistance option for most probable command
-cmd_goals = command_to_goals(top_command)
-cmd_goal_spec = MinActionCosts(cmd_goals, action_costs)
-sol = cmd_planner(domain, plan_end_state, cmd_goal_spec)
-top_assist_cmd_plan = collect(sol)
-focal_objs = extract_focal_objects_from_plan(top_command, top_assist_plan)
-
-top_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
-for obj in focal_objs
-    PDDL.get_objtype(state, obj) == assist_obj_type || continue
-    obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
-    top_assist_probs[obj_idx] += 1
-end
-
-# Print assistance options for most probable command
-println("Assistance options for most probable command:")
-for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), top_assist_probs)
-    @printf("%s : %.3f\n", obj, prob)
-end
-
-# Compute plan completion costs for most probable command
-cmd_plan = top_assist_cmd_plan
-cmd_end_state = EndStateSimulator()(domain, plan_end_state, cmd_plan)
-goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
-goal_plan = collect(goal_sol)
-top_assist_full_plan = vcat(cmd_plan, goal_plan)
-
-top_assist_plan_length = length(top_assist_full_plan)
-top_assist_human_cost =
-    filter(act -> act.args[1] == pddl"(human)", top_assist_full_plan) |> length
-
-# Print plan completion costs for most probable command
-println("Plan completion costs for most probable command:")
-@printf("Top assist plan length: %d\n", top_assist_plan_length)
-@printf("Top assist human cost: %d\n", top_assist_human_cost)
-
-# Compute assistance options in expectation via systematic sampling
-n_samples = 50
-count = 0
-u = rand() / n_samples
-total_prob = 0.0    
-expected_assist_probs = zeros(length(PDDL.get_objects(state, assist_obj_type)))
-for (cmd, prob) in zip(commands, command_probs)
-    count == n_samples && break
-    n_copies = 0
-    total_prob += prob
-    while u <= total_prob
-        n_copies += 1
-        count += 1
-        u += 1 / n_samples
-    end
-    tmp_assist_probs = zeros(size(expected_assist_probs))
-    cmd_goals = command_to_goals(cmd)
-    cmd_goal_spec = MinActionCosts(cmd_goals, action_costs)
-    sol = cmd_planner(domain, plan_end_state, cmd_goal_spec)
-    if sol isa NullSolution || sol.status != :success
-        continue
-    end
-    assist_cmd_plan = collect(sol)
-    focal_objs = extract_focal_objects_from_plan(cmd, assist_cmd_plan)
-    for obj in focal_objs
-        PDDL.get_objtype(state, obj) == assist_obj_type || continue
-        obj_idx = findfirst(==(obj), PDDL.get_objects(state, assist_obj_type))
-        tmp_assist_probs[obj_idx] += 1
-    end
-    expected_assist_probs .+= tmp_assist_probs .* (n_copies / n_samples)
-end
-
-# Print assistance options in expectation across all commands
-println("Assistance options in expectation across all commands:")
-for (obj, prob) in zip(PDDL.get_objects(state, assist_obj_type), expected_assist_probs)
-    @printf("%s : %.3f\n", obj, prob)
-end
+# Compute expected assistance options and plans via systematic sampling
+expected_efficient_assist_results = literal_assistance_efficient(
+    commands, command_probs,
+    domain, plan_end_state, true_goal_spec, assist_obj_type;
+    verbose = true, n_samples = 50
+)
 
 ## Configure agent and world model ##
 
