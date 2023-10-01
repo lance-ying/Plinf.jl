@@ -1,4 +1,4 @@
-;Can you find 3 forks and some glasses?
+;Can you bring the plates?
 (takeout human cutleryfork1 cabinet4)
 (noop robot)
 (takeout human cutleryfork2 cabinet4)

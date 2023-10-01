@@ -1,4 +1,4 @@
-;I'll get juice, can you get the glasses and some cupcakes for afternoon tea?
+;I need a knife, can you get it?
 (takeout human tomato1 fridge1)
 (noop robot)
 (takeout human cucumber1 fridge1)

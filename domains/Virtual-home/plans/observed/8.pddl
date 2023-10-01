@@ -1,4 +1,4 @@
-;I'll grab 3 plates for dinner, can you help me find the forks and knives?
+;Can you find 3 forks and some glasses?
 (takeout human plate1 cabinet2)
 (noop robot)
 (takeout human wine1 fridge1)

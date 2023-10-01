@@ -8,15 +8,18 @@ using GenParticleFilters: softmax
 
 include("utils.jl")
 include("plan_io.jl")
+include("utterance_model.jl")
+include("inference.jl")
 include("render.jl")
 include("callbacks.jl")
 
+PDDL.Arrays.@register()
 GLMakie.activate!(inline=false)
 
 ## Load domains, problems and plans ##
 
 # Define directory paths
-PROBLEM_DIR = joinpath(@__DIR__, "problems")
+# PROBLEM_DIR = joinpath(@__DIR__, "problems")
 PLAN_DIR = joinpath(@__DIR__, "plans", "observed")
 COMPLETION_DIR = joinpath(@__DIR__, "plans", "completed")
 STIMULI_DIR = joinpath(@__DIR__, "stimuli")
@@ -45,9 +48,24 @@ plan_id = "2.1.keys"
 plan = PLANS[plan_id]
 utterances = UTTERANCES[plan_id]
 utterance_times = UTTERANCE_TIMES[plan_id]
-# assist_type = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[3]
 
-problem = load_problem(joinpath(@__DIR__, "room.pddl"))
+assist_type = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[3]
+assist_obj_type = assist_type == "keys" ? :key : :door
+
+problem_id = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[1]
+problem = PROBLEMS[problem_id]
+
+# Determine true goal from completion
+completion = COMPLETIONS[plan_id]
+true_goal_obj = completion[end].args[2]
+true_goal = Compound(:has, Term[pddl"(human)", true_goal_obj])
+
+# Construct true goal specification
+action_costs = (
+    pickup=1.0, unlock=1.0, handover=1.0, 
+    up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
+)
+true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
 
 # Compile domain for problem
 domain = get!(COMPILED_DOMAINS, problem_id) do
@@ -59,68 +77,121 @@ end
 # Construct initial state
 state = initstate(domain, problem)
 
+# Simulate plan to completion
+plan_end_state = EndStateSimulator()(domain, state, plan)
+
 ## Run literal listener inference ##
 
-# Enumerate over robot-directed commands
-actions, agents, predicates = enumerate_salient_actions(domain, state)
-commands = enumerate_commands(actions, agents, predicates)
-commands = lift_command.(commands, [state])
-unique!(commands)
+# Infer distribution over commands
+commands, command_probs, command_scores =
+    literal_command_inference(domain, plan_end_state, utterances[1], verbose=true)
+top_command = commands[1]
 
-# Generate constrained trace from literal listener model
-choices = choicemap((:utterance => :output, utterances[1]))
-trace, _ = generate(literal_utterance_model, (domain, state, commands), choices)
-
-# Extract unnormalized log-probabilities of utterance conditioned on each command
-command_scores = extract_utterance_scores_per_command(trace)
-
-# Compute posterior probability of each command
-command_probs = softmax(scores)
-
-# Get top 5 commands most probable commands
-top_command_idxs = sortperm(scores, rev=true)[1:5]
-
-# Print commands and their probabilities
-for idx in top_command_idxs
+# Print top 5 commands and their probabilities
+println("Top 5 most probable commands:")
+for idx in 1:5
     command_str = repr("text/plain", commands[idx])
     @printf("%.3f: %s\n", command_probs[idx], command_str)
 end
 
+# Compute naive assistance options and plans for top command
+top_naive_assist_results = literal_assistance_naive(
+    top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
+    verbose = true
+)
+
+# Compute expected assistance options and plans via systematic sampling
+expected_naive_assist_results = literal_assistance_naive(
+    commands, command_probs,
+    domain, plan_end_state, true_goal_spec, assist_obj_type;
+    verbose = true, n_samples = 5
+)
+
+# Compute efficient assistance options and plans for top command
+top_efficient_assist_results = literal_assistance_efficient(
+    top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
+    verbose = true
+)
+
+# Compute expected assistance options and plans via systematic sampling
+expected_efficient_assist_results = literal_assistance_efficient(
+    commands, command_probs,
+    domain, plan_end_state, true_goal_spec, assist_obj_type;
+    verbose = true, n_samples = 50
+)
+
 ## Configure agent and world model ##
 
 # Set options that vary across runs
-ACT_TEMPERATURE = 4.0
+ACT_TEMPERATURE = 1.0
 MODALITIES = (:action, :utterance)
 
 # Define possible goals
 goals = @pddl("(has human gem1)", "(has human gem2)",
               "(has human gem3)", "(has human gem4)")
-goal_idxs = collect(1:length(goals))
 goal_names = ["red", "yellow", "blue", "green"]
+
+# Define possible cost profiles
+cost_profiles = [
+    ( # Equal cost profile
+        human = (
+            pickup=1.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        ),
+        robot = (
+            pickup=1.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        )
+    ),
+    ( # Human has higher cost for pickup
+        human = (
+            pickup=5.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        ),
+        robot = (
+            pickup=1.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        )
+    ),
+    ( # Robot has higher cost for unlock
+        human = (
+            pickup=1.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        ),
+        robot = (
+            pickup=1.0, unlock=5.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        )
+    ),
+    ( # Combination of the above
+        human = (
+            pickup=5.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        ),
+        robot = (
+            pickup=1.0, unlock=5.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        )
+    )
+]    
 
 # Define goal prior
 @gen function goal_prior()
     # Sample goal index
     goal ~ uniform_discrete(1, length(goals))
-    # Define action costs (TO-DO: add uncertainty over relative costs)
-    costs = (
-        human=(
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.5
-        ),
-        robot = (
-            pickup=1.0, unlock=2.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.5
-        )
-    )
+    # Sample action costs
+    cost_idx ~ uniform_discrete(1, length(cost_profiles))
+    costs = cost_profiles[cost_idx]
     # Construct goal specification
     spec = MinPerAgentActionCosts(Term[goals[goal]], costs)
     return spec
 end
 
-# Construct iterator over goal choicemaps for stratified sampling
+# Construct iterator over goals and cost profiles for stratified sampling
 goal_addr = :init => :agent => :goal => :goal
-goal_strata = choiceproduct((goal_addr, 1:length(goals)))
+cost_addr = :init => :agent => :goal => :cost_idx
+init_strata = choiceproduct((goal_addr, 1:length(goals)),
+                            (cost_addr, 1:length(cost_profiles)))
 
 # Configure planner
 heuristic = memoized(precomputed(GoalManhattan(), domain, state))
@@ -193,7 +264,7 @@ if :utterance in MODALITIES
 end
 
 # Construct callback for logging data and visualizing inference
-renderer = get(renderer_dict, assist_type, renderer)
+renderer = get(renderer_dict, assist_type, RENDERER)
 callback = DKGCombinedCallback(
     renderer, domain;
     goal_addr = goal_addr,
@@ -224,10 +295,10 @@ callback = DKGCombinedCallback(
 sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
 
 # Run particle filter to perform online goal inference
-n_samples = length(goal_strata)
+n_samples = length(init_strata)
 pf_state = sips(
     n_samples,  observations;
-    init_args=(init_strata=goal_strata,),
+    init_args=(init_strata=init_strata,),
     callback=callback
 );
 
@@ -235,3 +306,13 @@ pf_state = sips(
 goal_probs = callback.logger.data[:goal_probs]
 goal_probs = reduce(hcat, goal_probs)
 
+# Extract cost probabilities
+cost_probs = callback.logger.data[:cost_probs]
+cost_probs = reduce(hcat, cost_probs)
+
+## Compute pragmatic assistance options and plans ##
+
+pragmatic_assist_results = pragmatic_assistance_offline(
+    pf_state, domain, plan_end_state, true_goal_spec, assist_obj_type;
+    act_temperature = ACT_TEMPERATURE, verbose = true
+)

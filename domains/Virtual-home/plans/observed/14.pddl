@@ -1,4 +1,4 @@
-;Could you fetch the rest of the knives and some plates?
+;Can you get the bottle from fridge?
 (takeout human wineglass1 cabinet3)
 (noop robot)
 (takeout human wineglass2 cabinet3)

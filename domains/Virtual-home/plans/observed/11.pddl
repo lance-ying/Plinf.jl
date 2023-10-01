@@ -1,4 +1,4 @@
-;I will get the vegetables from the fridge, can you get a knife?
+;Could you fetch the rest of the knives and some plates?
 (takeout human cutleryfork1 cabinet4)
 (noop robot)
 (takeout human cutleryfork2 cabinet4)
