@@ -37,6 +37,10 @@ function literal_command_inference(
     # Lift commands and remove duplicates
     commands = lift_command.(commands, [state])
     unique!(commands)
+    # Add starting space to utterance if it doesn't have one
+    if utterance[1] != ' '
+        utterance = " $utterance"
+    end
     # Generate constrained trace from literal listener model
     verbose && println("Evaluating logprobs of observed utterance...")
     choices = choicemap((:utterance => :output, utterance))
@@ -477,6 +481,9 @@ function pragmatic_goal_inference(
         pushfirst!(timesteps, 0)
         # Constrain `speak` and `utterance` for each step where speech occurs
         for (t, utt) in zip(utterance_times, utterances)
+            if utt[1] != ' ' # Add starting space to utterance if missing
+                utt = " $utt"
+            end
             if t == 0
                 speak_addr = :init => :act => :speak
                 utterance_addr = :init => :act => :utterance => :output
