@@ -104,7 +104,7 @@ top_naive_assist_results = literal_assistance_naive(
 expected_naive_assist_results = literal_assistance_naive(
     commands, command_probs,
     domain, plan_end_state, true_goal_spec, assist_obj_type;
-    verbose = true, n_samples = 5
+    verbose = true, n_samples = 10
 )
 
 # Compute efficient assistance options and plans for top command
@@ -117,7 +117,7 @@ top_efficient_assist_results = literal_assistance_efficient(
 expected_efficient_assist_results = literal_assistance_efficient(
     commands, command_probs,
     domain, plan_end_state, true_goal_spec, assist_obj_type;
-    verbose = true, n_samples = 50
+    verbose = true, n_samples = 10
 )
 
 ## Configure agent and world model ##
@@ -214,6 +214,7 @@ agent_config = AgentConfig(
     goal_config = StaticGoalConfig(goal_prior),
     # Assume the agent refines its policy at every timestep
     replan_args = (
+        plan_at_init = true, # Plan at initial timestep
         prob_replan = 0, # Probability of replanning at each timestep
         prob_refine = 1.0, # Probability of refining solution at each timestep
         rand_budget = false # Search budget is fixed everytime
@@ -251,6 +252,9 @@ if :utterance in MODALITIES
     pushfirst!(timesteps, 0)
     # Constrain `speak` and `utterance` for each timestep where speech occurs
     for (t, utt) in zip(utterance_times, utterances)
+        if utt[1] != ' ' # Add starting space to utterance if missing
+            utt = " $utt"
+        end
         if t == 0
             speak_addr = :init => :act => :speak
             utterance_addr = :init => :act => :utterance => :output
@@ -282,11 +286,11 @@ callback = DKGCombinedCallback(
 # For only data logging and printing, use these callbacks
 # logger_cb = DataLoggerCallback(
 #     t = (t, pf) -> t::Int,
-#     goal_probs = pf -> probvec(pf, goal_addr, 1:n_goals)::Vector{Float64},
+#     goal_probs = pf -> probvec(pf, goal_addr, 1:length(goals))::Vector{Float64},
 #     lml_est = pf -> log_ml_estimate(pf)::Float64,
 # )
 # print_cb = PrintStatsCallback(
-#     (goal_addr, 1:n_goals);
+#     (goal_addr, 1:length(goals));
 #     header="t\t" * join(goal_names, "\t") * "\n"
 # )
 # callback = CombinedCallback(logger=logger_cb, print=print_cb)
