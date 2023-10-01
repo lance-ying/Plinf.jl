@@ -72,6 +72,8 @@ Base.hash(command::ActionCommand, h::UInt) =
     hash(command.predicates, hash(command.actions, h))
 Base.:(==)(cmd1::ActionCommand, cmd2::ActionCommand) =
     cmd1.actions == cmd2.actions && cmd1.predicates == cmd2.predicates
+Base.issetequal(cmd1::ActionCommand, cmd2::ActionCommand) =
+    issetequal(cmd1.actions, cmd2.actions) && issetequal(cmd1.predicates, cmd2.predicates)
 
 function Base.show(io::IO, ::MIME"text/plain", command::ActionCommand)
     # Note that this filters out the ? token for variables before printing
@@ -146,7 +148,14 @@ function ground_command(
         predicates = map(pred -> PDDL.substitute(pred, s), command.predicates)
         push!(g_commands, ActionCommand(actions, predicates))
     end
-    return g_commands
+    # Remove duplicate groundings according to set equality
+    unique_g_commands = ActionCommand[]
+    for g_cmd in g_commands
+        if !any(issetequal(g_cmd, ug_cmd) for ug_cmd in unique_g_commands)
+            push!(unique_g_commands, g_cmd)
+        end
+    end
+    return unique_g_commands
 end
 
 "Convert an action command to one or more goal formulas."
