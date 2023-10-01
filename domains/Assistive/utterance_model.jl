@@ -565,6 +565,7 @@ end
     actions, agents, predicates = extract_salient_actions(domain, state, plan)
     # Enumerate action commands
     commands = enumerate_commands(actions, agents, predicates)
+    commands = lift_command.(commands, [state])
     # Construct prompts for each unique action command
     if isempty(commands)
         prompts = ["\n"]
