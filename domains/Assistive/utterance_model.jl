@@ -507,15 +507,15 @@ function construct_utterance_prompt(command::ActionCommand, examples)
     return prompt
 end
 
-# Define GPT-3 mixture generative function
-gpt3_mixture = GPT3Mixture(model="text-curie-001", stop="\n", max_tokens=64)
-
 "Extract unnormalized logprobs of utterance conditioned on each command."
 function extract_utterance_scores_per_command(trace::Trace, addr=:utterance)
     # Extract GPT-3 mixture trace over utterances
     utt_trace = trace.trie.leaf_nodes[addr].subtrace_or_retval
     return utt_trace.scores
 end
+
+# Define GPT-3 mixture generative function for literal utterance model
+literal_gpt3_mixture = GPT3Mixture(model="text-curie-001", stop="\n", max_tokens=64)
 
 "Literal utterance model for human instructions using an LLM likelihood."
 @gen function literal_utterance_model(
@@ -539,9 +539,12 @@ end
         end
     end
     # Sample utterance from GPT-3 mixture over prompts
-    utterance ~ gpt3_mixture(prompts)
+    utterance ~ literal_gpt3_mixture(prompts)
     return utterance
 end
+
+# Define GPT-3 mixture generative function for pragmatic utterance model
+pragmatic_gpt3_mixture = GPT3Mixture(model="curie", stop="\n", max_tokens=64)
 
 "Pragmatic utterance model for human instructions using an LLM likelihood."
 @gen function pragmatic_utterance_model(
@@ -581,6 +584,6 @@ end
         end
     end
     # Sample utterance from GPT-3 mixture over prompts
-    utterance ~ gpt3_mixture(prompts, probs)
+    utterance ~ pragmatic_gpt3_mixture(prompts, probs)
     return utterance
 end
