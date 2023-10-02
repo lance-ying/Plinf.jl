@@ -624,9 +624,9 @@ each timestep via expected cost minimization, where the expectation is taken
 over goal specifications. Returns the distribution over assistance options,
 the assistive plan, and the expected cost of that plan.
 
-Assistance is offline, because the human speaker is simulated to follow the 
-policies corresponding to the true goal, instead of following some external
-policy.
+Assistance is offline, because the assistant plans ahead based on its current 
+belief about the speaker's goal, instead of updating its belief as it observes
+the speaker's actions.
 """
 function pragmatic_assistance_offline(
     pf::ParticleFilterState,
@@ -647,13 +647,12 @@ function pragmatic_assistance_offline(
     goal_specs = map(pf.traces) do trace
         trace[:init => :agent => :goal]
     end
-    if start_t == 0
-        pf = copy(pf)
-        argdiffs = (UnknownChange(), NoChange())
-        pf_update!(pf, (1, model_config), argdiffs, choicemap())
-    end
-    policies = map(pf.traces) do trace 
-        copy(trace[:timestep => max(start_t, 1) => :agent => :plan].sol)
+    policies = map(pf.traces) do trace
+        if start_t == 0
+            copy(trace[:init => :agent => :plan].sol)
+        else
+            copy(trace[:timestep => start_t => :agent => :plan].sol)
+        end
     end
     heuristic = memoized(GoalManhattan())
     planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^16)
