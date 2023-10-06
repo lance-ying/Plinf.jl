@@ -1,0 +1,13 @@
+(move human cabinet4)
+(noop robot)
+(grab human cutleryfork1 cabinet4)
+(noop robot)
+(grab human cutleryfork2 cabinet4)
+(noop robot)
+(grab human cutleryfork3 cabinet4)
+(noop robot)
+(grab human cutleryfork4 cabinet4)
+(noop robot)
+(grab human cutleryknife1 cabinet4)
+(noop robot)
+; Could you fetch the rest of the knives and some plates?

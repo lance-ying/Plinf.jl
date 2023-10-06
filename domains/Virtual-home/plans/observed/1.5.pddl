@@ -1,0 +1,10 @@
+(move human cabinet4)
+(noop robot)
+(grab human cutleryfork1 cabinet4)
+(noop robot)
+(grab human cutleryfork2 cabinet4)
+(noop robot)
+(grab human cutleryfork3 cabinet4)
+(noop robot)
+(grab human juice1 fridge1)
+; Can you get the glasses and some cupcakes for afternoon tea?

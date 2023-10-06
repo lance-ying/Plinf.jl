@@ -20,16 +20,13 @@ costs = (
     get_h=10.0,get_r=1.0, move=20, noop=0.6
 )
 
-costs = (
-    takeout_h=10.0,takeout_r=1.0, putdown_h=10.0,putdown_r=1.0, noop=0.6
-)
 
 costs = (human = (
-    move=10, grab=10, noop=0.6
+    move=10, get=10, noop=0.6
 ),
 
 robot = (
-    move=5, grab=1, noop=0.6
+    move=5, get=1, noop=0.6
 ))
 
 
@@ -43,7 +40,7 @@ PDDL.Arrays.register!()
 
 # Load domain and problem
 domain = load_domain(joinpath(@__DIR__, "domain1.pddl"))
-problem = load_problem(joinpath(@__DIR__, "room.pddl"))
+problem = load_problem(joinpath(@__DIR__, "room1.pddl"))
 
 # Initialize state
 state = initstate(domain, problem)
@@ -52,9 +49,6 @@ state = initstate(domain, problem)
 domain, state = PDDL.compiled(domain, state)
 domain = CachedDomain(domain)
 
-traj = PDDL.simulate(domain, state, @pddl("(move human table1 fridge1)","(noop robot)","(grab human chicken1 fridge1)","(noop robot)","(grab human cucumber1 fridge1)"))
-
-
 heuristic = memoized(precomputed(FFHeuristic(), domain, state))
 # Check that A* heuristic search correctly solves the problem
 astar = AStarPlanner(heuristic,  max_nodes=50000, h_mult=1.5)
@@ -62,86 +56,11 @@ astar = AStarPlanner(heuristic,  max_nodes=50000, h_mult=1.5)
 goal = pddl"(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cutleryfork4) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3)(delivered cutleryknife4) (delivered plate1)(delivered plate2)(delivered plate3)(delivered plate4))"
 
 spec = Specification(goal)
-spec = MinPerAgentActionCosts(goal, costs)
+spec = MinPerAgentActionCosts(goals[7], costs)
 
 
-@time sol = astar(domain, traj[end], spec)
+@time sol = astar(domain, state, spec)
 
-plan_dict = Dict()
-
-costs = (human = (
-    move=5, grab=1.2, noop=0.6
-),
-
-robot = (
-    move=5, grab=1, noop=0.6
-))
-
-pid="2.8"
-goal = goal_dict[pid_dict[pid]]
-plan = action_dict[pid]
-# print(plan)
-if plan isa Term
-    plan = [plan]
-end
-# if length(plan)==1
-#     plan = pddl"(noop human)"
-# end
-traj = PDDL.simulate(domain, state, plan)
-spec = MinPerAgentActionCosts(goal, costs)
-sol = astar(domain, traj[end], spec)
-show(write_pddl.(sol))
-# plan_dict[pid] = write_pddl.(sol)
-
-for pid in ["2.8","1.9"]
-    costs = (human = (
-    move=5, grab=1.2, noop=0.6
-),
-
-robot = (
-    move=5, grab=1, noop=0.6
-))
-    goal = goal_dict[pid_dict[pid]]
-    plan = action_dict[pid]
-    # print(plan)
-    if plan isa Term
-        plan = [plan]
-    end
-    # if length(plan)==1
-    #     plan = pddl"(noop human)"
-    # end
-    traj = PDDL.simulate(domain, state, plan)
-    spec = MinPerAgentActionCosts(goal, costs)
-    sol = astar(domain, traj[end], spec)
-    show(write_pddl.(sol))
-    plan_dict[pid] = write_pddl.(sol)
-
-end
-
-for pid in ["2.9","1.11"]
-    costs = (robot = (
-    move=8, grab=1.2, noop=0.6
-),
-
-human = (
-    move=8, grab=1, noop=0.6
-))
-    goal = goal_dict[pid_dict[pid]]
-    plan = action_dict[pid]
-    # print(plan)
-    if plan isa Term
-        plan = [plan]
-    end
-    # if length(plan)==1
-    #     plan = pddl"(noop human)"
-    # end
-    traj = PDDL.simulate(domain, state, plan)
-    spec = MinPerAgentActionCosts(goal, costs)
-    sol = astar(domain, traj[end], spec)
-    show(write_pddl.(sol))
-    plan_dict[pid] = write_pddl.(sol)
-
-end
 
 plan = action_dict[p]
 traj = PDDL.simulate(domain, state, plan)

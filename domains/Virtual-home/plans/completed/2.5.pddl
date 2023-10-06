@@ -1,0 +1,7 @@
+(move robot table1 cabinet2)
+(noop human)
+(grab robot plate1 cabinet2)
+(noop human)
+(grab robot plate2 cabinet2)
+(noop human)
+(grab robot plate3 cabinet2)

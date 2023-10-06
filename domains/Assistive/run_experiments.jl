@@ -170,7 +170,7 @@ for plan_id in PLAN_IDS[3:end]
     action_costs = COST_PROFILES[1][1]
     true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
 
-    # Sellect cost profiles based on assistance type
+    # Select cost profiles based on assistance type
     if assist_type == "doors"
         cost_profiles = COST_PROFILES[2:2]
     elseif assist_type == "keys"

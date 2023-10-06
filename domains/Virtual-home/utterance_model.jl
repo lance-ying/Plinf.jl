@@ -308,7 +308,7 @@ end
 function extract_salient_actions(
     domain::Domain, state::State, plan::AbstractVector{<:Term};
     salient_actions = [
-        (:takeout, 1, 2),
+        (:get, 1, 2),
     ],
     salient_predicates = []
 )
