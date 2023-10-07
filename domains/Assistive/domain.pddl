@@ -101,7 +101,7 @@
     (:action handover
      :parameters (?a - agent ?b - agent ?i - item)
      :precondition
-        (and (active ?a) (not (frozen ?a)) (has ?a ?i) (not (= ?a ?b))
+        (and (active ?a) (has ?a ?i) (not (= ?a ?b))
             (not (forbidden ?a ?i)) (not (forbidden ?b ?i))
             (or (and (= (xloc ?a) (xloc ?b)) (= (- (yloc ?a) 1) (yloc ?b)))
                 (and (= (xloc ?a) (xloc ?b)) (= (+ (yloc ?a) 1) (yloc ?b)))

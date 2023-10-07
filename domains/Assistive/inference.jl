@@ -10,6 +10,7 @@ using SymbolicPlanners: get_goal_terms, set_goal_terms
 PDDL.Arrays.@register()
 
 include("utils.jl")
+include("heuristics.jl")
 include("plan_io.jl")
 include("utterance_model.jl")
 
@@ -84,8 +85,8 @@ function literal_assistance_naive(
     speaker = pddl"(human)",
     listener = pddl"(robot)",
     max_steps = 100,
-    cmd_planner = AStarPlanner(GoalManhattan(), max_nodes=2^15),
-    goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16),
+    cmd_planner = AStarPlanner(DoorsKeysMSTHeuristic(), max_nodes=2^16),
+    goal_planner = AStarPlanner(DoorsKeysMSTHeuristic(), max_nodes=2^16),
     verbose::Bool = false
 )
     # Compute assistance options, averaged over possible groundings
@@ -129,10 +130,11 @@ function literal_assistance_naive(
             verbose && println("Plan found: $(length(cmd_plan)) actions")
         end
         push!(assist_cmd_plans, cmd_plan)
-        # Compute remainder that satifies speaker's true goal
+        # Compute remainder that satifies speaker's true goal, freezing listener
         verbose && println("Planning for remainder...")
         cmd_end_state = isempty(cmd_plan) ?
             state : EndStateSimulator()(domain, state, cmd_plan)
+        cmd_end_state[Compound(:frozen, Term[listener])] = true
         goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
         if goal_sol isa NullSolution || goal_sol.status != :success
             goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
@@ -147,15 +149,25 @@ function literal_assistance_naive(
     
     # Compute average costs of assistance plans
     verbose && println("\nComputing plan costs...")
-    assist_plan_cost = mean(length.(assist_full_plans))
+    assist_plan_cost = min(mean(length.(assist_full_plans)), max_steps)
+    assist_move_cost = map(assist_cmd_plans) do plan
+        map(plan) do act
+            act == PDDL.no_op && return 0.0
+            act.name == :no_op && return 0.0
+            act.args[1] == listener && return 0.0
+            return 1.0
+        end |> sum
+    end |> mean
     if verbose
         @printf("Average plan cost: %.2f\n", assist_plan_cost)
+        @printf("Average speaker move cost: %.2f\n", assist_move_cost)
     end
     
     return (
         assist_objs = assist_objs,
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
+        move_cost = assist_move_cost,
         cmd_plans = assist_cmd_plans,
         full_plans = assist_full_plans,
     )
@@ -185,6 +197,7 @@ function literal_assistance_naive(
     assist_objs = sort!(collect(assist_objs), by=string)
     assist_option_probs = zeros(length(assist_objs))
     assist_plan_costs = Float64[]
+    assist_move_costs = Float64[]
     sample_probs = Float64[]
     verbose && println("Computing expected values via systematic sampling...")
     # Compute expected assistance options and costs via systematic sampling
@@ -196,20 +209,24 @@ function literal_assistance_naive(
         )
         assist_option_probs .+= result.assist_option_probs .* prob
         push!(assist_plan_costs, result.plan_cost)
+        push!(assist_move_costs, result.move_cost)
         push!(sample_probs, prob)
     end
     assist_plan_cost = assist_plan_costs' * sample_probs
+    assist_move_cost = assist_move_costs' * sample_probs
     if verbose
         println("Option probabilities:")
         for (obj, prob) in zip(assist_objs, assist_option_probs)
             @printf("  %s: %.3f\n", obj, prob)
         end
         @printf("Average plan cost: %.2f\n", assist_plan_cost)
+        @printf("Average speaker move cost: %.2f\n", assist_move_cost)
     end
     return (
         assist_objs = assist_objs,
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
+        move_cost = assist_move_cost,
         sampled_plan_costs = assist_plan_costs,
         sample_probs = sample_probs,
     )
@@ -234,8 +251,8 @@ function literal_assistance_efficient(
     speaker = pddl"(human)",
     listener = pddl"(robot)",
     max_steps = 100,
-    cmd_planner = AStarPlanner(GoalManhattan(), max_nodes=2^15),
-    goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16),
+    cmd_planner = AStarPlanner(DoorsKeysMSTHeuristic(), max_nodes=2^16),
+    goal_planner = AStarPlanner(DoorsKeysMSTHeuristic(), max_nodes=2^16),
     verbose::Bool = false
 )
     # Compute plan that satisfies command
@@ -251,10 +268,11 @@ function literal_assistance_efficient(
         verbose && println("Plan found: $(length(cmd_plan)) actions")
     end
     
-    # Compute remainder that satifies speaker's true goal
+    # Compute remainder that satifies speaker's true goal, freezing listener
     verbose && println("Planning for remainder...")
     cmd_end_state = isempty(cmd_plan) ?
         state : EndStateSimulator()(domain, state, cmd_plan)
+    cmd_end_state[Compound(:frozen, Term[listener])] = true
     goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
     if goal_sol isa NullSolution || goal_sol.status != :success
         goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
@@ -287,15 +305,23 @@ function literal_assistance_efficient(
 
     # Compute costs of assistance plans
     verbose && println("Computing plan cost...")
-    assist_plan_cost = length(full_plan)
+    assist_plan_cost = min(length(full_plan), max_steps)
+    assist_move_cost = map(full_plan) do act
+        act == PDDL.no_op && return 0.0
+        act.name == :no_op && return 0.0
+        act.args[1] == listener && return 0.0
+        return 1.0
+    end |> sum
     if verbose
         @printf("Plan cost: %.2f\n", assist_plan_cost)
+        @printf("Speaker move cost: %.2f\n", assist_move_cost)
     end
 
     return (
         assist_objs = assist_objs,
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
+        move_cost = assist_move_cost,
         cmd_plan = cmd_plan,
         full_plan = full_plan
     )
@@ -325,6 +351,7 @@ function literal_assistance_efficient(
     assist_objs = sort!(collect(assist_objs), by=string)
     assist_option_probs = zeros(length(assist_objs))
     assist_plan_costs = Float64[]
+    assist_move_costs = Float64[]
     sample_probs = Float64[]
     # Compute expected assistance options and costs via systematic sampling
     verbose && println("Computing expected values via systematic sampling...")
@@ -336,10 +363,12 @@ function literal_assistance_efficient(
         )
         assist_option_probs .+= result.assist_option_probs .* prob
         push!(assist_plan_costs, result.plan_cost)
+        push!(assist_move_costs, result.move_cost)
         push!(sample_probs, prob)
         verbose && println()
     end
     assist_plan_cost = assist_plan_costs' * sample_probs
+    assist_move_cost = assist_move_costs' * sample_probs
     if verbose
         println("== Expected values ==")
         println("Option probabilities:")
@@ -347,11 +376,13 @@ function literal_assistance_efficient(
             @printf("  %s: %.3f\n", obj, prob)
         end
         @printf("Plan cost: %.2f\n", assist_plan_cost)
+        @printf("Speaker move cost: %.2f\n", assist_move_cost)
     end
     return (
         assist_objs = assist_objs,
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
+        move_cost = assist_move_cost,
         sampled_plan_costs = assist_plan_costs,
         sample_probs = sample_probs,
     )
@@ -717,7 +748,16 @@ function pragmatic_assistance_offline(
         end
     end
     assist_plan_cost = length(assist_plan)
-    verbose && @printf("Assist plan cost: %d\n", assist_plan_cost)
+    assist_move_cost = map(assist_plan) do act
+        act == PDDL.no_op && return 0.0
+        act.name == :no_op && return 0.0
+        act.args[1] == listener && return 0.0
+        return 1.0
+    end |> sum
+    if verbose
+        @printf("Plan cost: %d\n", assist_plan_cost)
+        @printf("Speaker move cost: %d\n", assist_move_cost)
+    end
     
     # Extract assistance options
     verbose && println("\nExtracting assistance options...")
@@ -743,6 +783,7 @@ function pragmatic_assistance_offline(
         assist_objs = assist_objs,
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
+        move_cost = assist_move_cost,
         full_plan = assist_plan        
     )
 end

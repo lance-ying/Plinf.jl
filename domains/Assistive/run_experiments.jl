@@ -8,6 +8,7 @@ using Dates
 using GenParticleFilters: softmax
 
 include("utils.jl")
+include("heuristics.jl")
 include("plan_io.jl")
 include("utterance_model.jl")
 include("inference.jl")
@@ -49,41 +50,41 @@ COST_PROFILES = [
     ( # Equal cost profile
         human = (
             pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         ),
         robot = (
             pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         )
     ),
     ( # Human has higher cost for pickup
         human = (
             pickup=5.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         ),
         robot = (
             pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         )
     ),
     ( # Robot has higher cost for unlock
         human = (
             pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         ),
         robot = (
             pickup=1.0, unlock=5.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         )
     ),
     ( # Combination of the above
         human = (
             pickup=5.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         ),
         robot = (
             pickup=1.0, unlock=5.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         )
     )
 ]
@@ -107,7 +108,7 @@ N_LITERAL_EFFICIENT_SAMPLES = 10
 
 # Whether to run literal or pragmatic inference
 RUN_LITERAL = true
-RUN_PRAGMATIC = true
+RUN_PRAGMATIC = false
 
 ## Run experiments ##
 
@@ -140,14 +141,15 @@ df = DataFrame(
     assist_probs_5 = Float64[],
     assist_probs_6 = Float64[],
     assist_plan = String[],
-    assist_plan_cost = Float64[]
+    assist_plan_cost = Float64[],
+    assist_move_cost = Float64[]
 )
 datetime = Dates.format(Dates.now(), "yyyy-mm-ddTHH-MM-SS")
-df_path = "experiments_$(datetime).csv"
+df_path = "literal_experiments_$(datetime).csv"
 df_path = joinpath(@__DIR__, df_path)
 
 # Iterate over plans
-for plan_id in PLAN_IDS[3:end]
+for plan_id in PLAN_IDS
     println("=== Plan $plan_id ===")
     # Load plan and problem
     plan = PLANS[plan_id]
@@ -217,8 +219,10 @@ for plan_id in PLAN_IDS[3:end]
         end
 
         # Set up planners
-        cmd_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16)
-        goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16)
+        cmd_planner = AStarPlanner(DoorsKeysMSTHeuristic(),
+                                   max_nodes=2^16, verbose=true)
+        goal_planner = AStarPlanner(DoorsKeysMSTHeuristic(),
+                                    max_nodes=2^16, verbose=true)
 
         # Set up dataframe entry        
         entry = copy(plan_entry)
@@ -240,6 +244,7 @@ for plan_id in PLAN_IDS[3:end]
         entry[:estim_type] = "mode"
         entry[:assist_plan] = ""
         entry[:assist_plan_cost] = top_naive_assist_results.plan_cost
+        entry[:assist_move_cost] = top_naive_assist_results.move_cost
         for (i, p) in enumerate(top_naive_assist_results.assist_option_probs)
             entry[Symbol("assist_probs_$i")] = p
         end
@@ -256,6 +261,7 @@ for plan_id in PLAN_IDS[3:end]
         entry[:estim_type] = "mean"
         entry[:assist_plan] = ""
         entry[:assist_plan_cost] = mean_naive_assist_results.plan_cost
+        entry[:assist_move_cost] = mean_naive_assist_results.move_cost
         for (i, p) in enumerate(mean_naive_assist_results.assist_option_probs)
             entry[Symbol("assist_probs_$i")] = p
         end
@@ -272,6 +278,7 @@ for plan_id in PLAN_IDS[3:end]
         entry[:assist_plan] =
             join(write_pddl.(top_efficient_assist_results.full_plan), "\n")
         entry[:assist_plan_cost] = top_efficient_assist_results.plan_cost
+        entry[:assist_move_cost] = top_efficient_assist_results.move_cost
         for (i, p) in enumerate(top_efficient_assist_results.assist_option_probs)
             entry[Symbol("assist_probs_$i")] = p
         end
@@ -288,6 +295,7 @@ for plan_id in PLAN_IDS[3:end]
         entry[:estim_type] = "mean"
         entry[:assist_plan] = ""
         entry[:assist_plan_cost] = mean_efficient_assist_results.plan_cost
+        entry[:assist_move_cost] = mean_efficient_assist_results.move_cost
         for (i, p) in enumerate(mean_efficient_assist_results.assist_option_probs)
             entry[Symbol("assist_probs_$i")] = p
         end
