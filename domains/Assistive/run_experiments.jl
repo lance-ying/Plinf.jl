@@ -140,6 +140,8 @@ df = DataFrame(
     assist_probs_4 = Float64[],
     assist_probs_5 = Float64[],
     assist_probs_6 = Float64[],
+    cmd_success = Float64[],
+    goal_success = Float64[],
     assist_plan = String[],
     assist_plan_cost = Float64[],
     assist_move_cost = Float64[]
@@ -169,8 +171,8 @@ for plan_id in PLAN_IDS
     true_goal = Compound(:has, Term[pddl"(human)", true_goal_obj])
 
     # Construct true goal specification
-    action_costs = COST_PROFILES[1][1]
-    true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
+    action_costs = COST_PROFILES[1]
+    true_goal_spec = MinPerAgentActionCosts(Term[true_goal], action_costs)
 
     # Sellect cost profiles based on assistance type
     if assist_type == "doors"
@@ -219,10 +221,10 @@ for plan_id in PLAN_IDS
         end
 
         # Set up planners
-        cmd_planner = AStarPlanner(DoorsKeysMSTHeuristic(),
-                                   max_nodes=2^16, verbose=true)
-        goal_planner = AStarPlanner(DoorsKeysMSTHeuristic(),
-                                    max_nodes=2^16, verbose=true)
+        heuristic = memoized(precomputed(DoorsKeysMSTHeuristic(),
+                                         domain, plan_end_state))
+        cmd_planner = AStarPlanner(heuristic, max_nodes=2^16, verbose=true)
+        goal_planner = AStarPlanner(heuristic, max_nodes=2^16, verbose=true)
 
         # Set up dataframe entry        
         entry = copy(plan_entry)
@@ -236,6 +238,7 @@ for plan_id in PLAN_IDS
 
         # Compute naive assistance options and plans for top command
         println()
+        println("- Naive literal assistance (top command) -")
         top_naive_assist_results = literal_assistance_naive(
             top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
             cmd_planner, goal_planner, max_steps = remain_steps, verbose = true
@@ -245,6 +248,8 @@ for plan_id in PLAN_IDS
         entry[:assist_plan] = ""
         entry[:assist_plan_cost] = top_naive_assist_results.plan_cost
         entry[:assist_move_cost] = top_naive_assist_results.move_cost
+        entry[:cmd_success] = top_naive_assist_results.cmd_success
+        entry[:goal_success] = top_naive_assist_results.goal_success
         for (i, p) in enumerate(top_naive_assist_results.assist_option_probs)
             entry[Symbol("assist_probs_$i")] = p
         end
@@ -252,6 +257,7 @@ for plan_id in PLAN_IDS
 
         # Compute expected assistance options and plans via systematic sampling
         println()
+        println("- Naive literal assistance (full distribution) -")
         mean_naive_assist_results = literal_assistance_naive(
             commands, command_probs,
             domain, plan_end_state, true_goal_spec, assist_obj_type;
@@ -262,6 +268,8 @@ for plan_id in PLAN_IDS
         entry[:assist_plan] = ""
         entry[:assist_plan_cost] = mean_naive_assist_results.plan_cost
         entry[:assist_move_cost] = mean_naive_assist_results.move_cost
+        entry[:cmd_success] = mean_naive_assist_results.cmd_success
+        entry[:goal_success] = mean_naive_assist_results.goal_success
         for (i, p) in enumerate(mean_naive_assist_results.assist_option_probs)
             entry[Symbol("assist_probs_$i")] = p
         end
@@ -269,6 +277,7 @@ for plan_id in PLAN_IDS
 
         # Compute efficient assistance options and plans for top command
         println()
+        println("- Efficient literal assistance (top command) -")
         top_efficient_assist_results = literal_assistance_efficient(
             top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
             cmd_planner, goal_planner, max_steps = remain_steps, verbose = true
@@ -279,6 +288,8 @@ for plan_id in PLAN_IDS
             join(write_pddl.(top_efficient_assist_results.full_plan), "\n")
         entry[:assist_plan_cost] = top_efficient_assist_results.plan_cost
         entry[:assist_move_cost] = top_efficient_assist_results.move_cost
+        entry[:cmd_success] = top_efficient_assist_results.cmd_success
+        entry[:goal_success] = top_efficient_assist_results.goal_success
         for (i, p) in enumerate(top_efficient_assist_results.assist_option_probs)
             entry[Symbol("assist_probs_$i")] = p
         end
@@ -286,6 +297,7 @@ for plan_id in PLAN_IDS
 
         # Compute expected assistance options and plans via systematic sampling
         println()
+        println("- Efficient literal assistance (full distribution) -")
         mean_efficient_assist_results = literal_assistance_efficient(
             commands, command_probs,
             domain, plan_end_state, true_goal_spec, assist_obj_type;
@@ -296,6 +308,8 @@ for plan_id in PLAN_IDS
         entry[:assist_plan] = ""
         entry[:assist_plan_cost] = mean_efficient_assist_results.plan_cost
         entry[:assist_move_cost] = mean_efficient_assist_results.move_cost
+        entry[:cmd_success] = mean_efficient_assist_results.cmd_success
+        entry[:goal_success] = mean_efficient_assist_results.goal_success
         for (i, p) in enumerate(mean_efficient_assist_results.assist_option_probs)
             entry[Symbol("assist_probs_$i")] = p
         end
@@ -391,4 +405,5 @@ for plan_id in PLAN_IDS
             GC.gc()
         end
     end
+    println()
 end
