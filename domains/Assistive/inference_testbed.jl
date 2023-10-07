@@ -7,6 +7,7 @@ using PDDLViz, GLMakie
 using GenParticleFilters: softmax
 
 include("utils.jl")
+include("heuristics.jl")
 include("plan_io.jl")
 include("utterance_model.jl")
 include("inference.jl")
@@ -43,7 +44,7 @@ PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 ## Set-up for specific plan and problem ##
 
 # Select plan and problem
-plan_id = "2.1.keys"
+plan_id = "4.1.keys"
 
 plan = PLANS[plan_id]
 utterances = UTTERANCES[plan_id]
