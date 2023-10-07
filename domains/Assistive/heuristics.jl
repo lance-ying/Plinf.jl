@@ -312,16 +312,23 @@ function compute(h::DoorsKeysMSTHeuristic,
         move_cost, noop_cost, pickup_cost, unlock_cost
     )
     # Compute MST cost for each goal clause
+    loc_objects = [h.objects; h.objects]
     cost = minimum(goal_clauses) do clause
         clause = PDDL.flatten_conjs(clause)
+        satisfy(domain, state, clause) && return 0.0
         goal_agents = unique!([term.args[1]::Const for term in clause])
         goal_items = unique!([term.args[2]::Const for term in clause])
-        mst_estim_cost(
+        c = mst_estim_cost(
             domain, state, goal_agents, goal_items,
-            h.room_labels, h.room_graph, h.objects, loc_graph;
+            h.room_labels, h.room_graph, loc_objects, loc_graph;
             all_doors = h.doors, unlockers = h.unlockers,
             max_iters = h.max_recurse_iters
         )
+        if any(state[Compound(:active, Term[a])] for a in goal_agents)
+            return max(0.0, c - noop_cost)
+        else
+            return c
+        end
     end
     return cost
 end
@@ -432,15 +439,14 @@ function construct_location_graph(
     cell_dists::Union{AbstractMatrix, Nothing} = nothing,
     move_cost = 1.0, noop_cost = 1.0, pickup_cost = 1.0, unlock_cost = 1.0
 )
-    n_agents = length(agents)
-    n_items = length(items)
-    n_doors = length(doors)
-    n_locations = length(objects)
+    n_agents, n_items, n_doors = length(agents), length(items), length(doors)
+    n_objects = length(objects)
+    n_locations = n_objects * 2
     graph = SimpleWeightedGraph(n_locations)
     height, width = size(room_labels)
     lin_idxs = LinearIndices(room_labels)
-    # Iterate over locations
-    for i in 2:n_locations
+    # Add objects and their locations to graph
+    for i in 1:n_objects
         x_i, y_i = get_obj_loc(state, objects[i])
         # Handle off-grid items
         has_i = false
@@ -448,12 +454,23 @@ function construct_location_graph(
             for agent in agents
                 if state[Compound(:has, Term[agent, objects[i]])]
                     x_i, y_i = get_obj_loc(state, agent)
-                    has_i = true
+                    has_i = true # Agent is holding item
                     break
                 end
             end
             (x_i < 0 || y_i < 0) && continue
         end
+        # Add edge from location to associated object
+        cost = if i <= n_agents # Agents
+            0.0
+        elseif n_agents < i <= n_agents + n_items # Items
+            has_i ? 0.0 : pickup_cost
+        else # Doors
+            locked = state[Compound(:locked, Term[objects[i]])]
+            locked ? max(0.0, unlock_cost - move_cost) : 0.0
+        end
+        add_edge!(graph, i, i + n_objects, cost == 0 ? eps() : cost)
+        # Look-up room label for location
         room_i = room_labels[y_i, x_i]
         neighbors_i = neighbors(room_graph, room_i)
         for j in 1:(i-1)
@@ -463,13 +480,14 @@ function construct_location_graph(
             if x_j < 0 || y_j < 0
                 for agent in agents
                     if state[Compound(:has, Term[agent, objects[j]])]
-                        has_j = true
+                        has_j = true # Agent is holding item
                         x_j, y_j = get_obj_loc(state, agent)
                         break
                     end
                 end
                 (x_j < 0 || y_j < 0) && continue
             end
+            # Check that locations are in the same or adjacent rooms
             room_j = room_labels[y_j, x_j]
             room_i == room_j || room_j in neighbors_i || continue
             # Estimate distance between locations
@@ -481,27 +499,13 @@ function construct_location_graph(
                 error("Invalid distance estimation method.")
             end
             # Compute cost of movement, accounting for other agents
-            cost = i <= n_agents && j <= n_agents ?
-                dist * move_cost : dist * (move_cost + noop_cost)
-            # Add cost of pickup
-            if pickup_cost > 0
-                if !has_i && n_agents < i <= n_agents + n_items
-                    cost += pickup_cost
-                elseif !has_j && n_agents < j <= n_agents + n_items
-                    cost += pickup_cost
-                end
+            cost = if i <= n_agents && j <= n_agents
+                dist * move_cost
+            else
+                dist * move_cost + dist * noop_cost
             end
-            # Add cost of unlocking
-            if unlock_cost > 0
-                if !has_i && n_agents + n_items < i <= n_locations
-                    locked = state[Compound(:locked, Term[objects[i]])]
-                    cost += locked ? unlock_cost : 0.0
-                elseif !has_j && n_agents + n_items < j <= n_locations
-                    locked = state[Compound(:locked, Term[objects[j]])]
-                    cost += locked ? unlock_cost : 0.0
-                end
-            end 
-            add_edge!(graph, i, j, cost)
+            # Add edge between locations
+            add_edge!(graph, i, j, cost == 0 ? eps() : cost)
         end
     end
     return graph
@@ -660,7 +664,8 @@ gridworld state. The first method takes room indices, and the second takes agent
 and item PDDL objects.
 
 Returns a vector of key/door sets, where each key/door set is a tuple of vectors
-of keys and doors that must be traversed in order to reach the goal room.
+of keys and doors that must be traversed in order to reach the goal room. This 
+vector is empty if there is no path between the rooms.
 """
 function find_necessary_keys_and_doors(
     domain::Domain, state::State,
@@ -700,7 +705,8 @@ to a set of goal rooms in a PDDL gridworld state. The first method takes room
 indices, and the second takes agent and item PDDL objects.
 
 Returns a vector of key/door sets, where each key/door set is a tuple of vectors
-of keys and doors that must be traversed in order to reach the goal rooms.
+of keys and doors that must be traversed in order to reach the goal rooms. This
+vector is empty if there is no path between the rooms.
 """
 function find_necessary_keys_and_doors(
     domain::Domain, state::State,
@@ -844,6 +850,21 @@ function mst_estim_cost(
     domain::Domain, state::State,
     agents::AbstractVector{Const},
     goals::AbstractVector{Const},
+    kd_sets::AbstractVector{<:Tuple},
+    loc_objects::Vector{Const}, loc_graph::AbstractGraph;
+    kwargs...
+)
+    isempty(kd_sets) && return Inf
+    return minimum(kd_sets) do (keys, doors)
+        mst_estim_cost(domain, state, agents, goals, keys, doors,
+                       loc_objects, loc_graph; kwargs...)
+    end
+end
+
+function mst_estim_cost(
+    domain::Domain, state::State,
+    agents::AbstractVector{Const},
+    goals::AbstractVector{Const},
     plan_keys::AbstractVector{Const},
     plan_doors::AbstractVector{Const},
     loc_objects::Vector{Const}, loc_graph::AbstractGraph;
@@ -858,22 +879,17 @@ function mst_estim_cost(
         plan_idxs = findall(in(objects), loc_objects)
         plan_subgraph, _ = induced_subgraph(loc_graph, plan_idxs)
         min_edges = kruskal_mst(plan_subgraph)
-        return sum(weight.(min_edges))
+        if length(min_edges) < nv(plan_subgraph) - 1
+            return Inf
+        else
+            total_weight = 0.0
+            for edge in min_edges
+                w = weight(edge)
+                w <= eps() && continue
+                total_weight += w
+            end
+            return total_weight
+        end
     end
     return cost
-end
-
-function mst_estim_cost(
-    domain::Domain, state::State,
-    agents::AbstractVector{Const},
-    goals::AbstractVector{Const},
-    kd_sets::AbstractVector{<:Tuple},
-    loc_objects::Vector{Const}, loc_graph::AbstractGraph;
-    kwargs...
-)
-    isempty(kd_sets) && return 0.0
-    return minimum(kd_sets) do (keys, doors)
-        mst_estim_cost(domain, state, agents, goals, keys, doors,
-                       loc_objects, loc_graph; kwargs...)
-    end
 end
