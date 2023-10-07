@@ -447,6 +447,9 @@ function construct_location_graph(
     lin_idxs = LinearIndices(room_labels)
     # Add objects and their locations to graph
     for i in 1:n_objects
+        is_agent_i = i <= n_agents
+        is_item_i = n_agents < i <= n_agents + n_items
+        is_door_i = n_agents + n_items < i <= n_objects
         x_i, y_i = get_obj_loc(state, objects[i])
         # Handle off-grid items
         has_i = false
@@ -461,19 +464,22 @@ function construct_location_graph(
             (x_i < 0 || y_i < 0) && continue
         end
         # Add edge from location to associated object
-        cost = if i <= n_agents # Agents
+        cost = if is_agent_i # Agents
             0.0
-        elseif n_agents < i <= n_agents + n_items # Items
+        elseif is_item_i # Items
             has_i ? 0.0 : pickup_cost
         else # Doors
             locked = state[Compound(:locked, Term[objects[i]])]
             locked ? max(0.0, unlock_cost - move_cost) : 0.0
         end
-        add_edge!(graph, i, i + n_objects, cost == 0 ? eps() : cost)
+        add_edge!(graph, i, i + n_objects, cost == 0.0 ? eps() : cost)
         # Look-up room label for location
         room_i = room_labels[y_i, x_i]
-        neighbors_i = neighbors(room_graph, room_i)
+        nbs_i = neighbors(room_graph, room_i)
         for j in 1:(i-1)
+            is_agent_j = j <= n_agents
+            is_item_j = n_agents < j <= n_agents + n_items
+            is_door_j = n_agents + n_items < j <= n_objects
             x_j, y_j = get_obj_loc(state, objects[j])
             # Handle off-grid items
             has_j = false
@@ -489,7 +495,11 @@ function construct_location_graph(
             end
             # Check that locations are in the same or adjacent rooms
             room_j = room_labels[y_j, x_j]
-            room_i == room_j || room_j in neighbors_i || continue
+            nbs_j = neighbors(room_graph, room_j)
+            if !(room_i == room_j || room_j in nbs_i ||
+                 is_door_i && is_door_j && !isempty(intersect(nbs_i, nbs_j)))
+                continue
+            end        
             # Estimate distance between locations
             if dist_estim == :manhattan
                 dist = abs(x_i - x_j) + abs(y_i - y_j)
@@ -505,7 +515,7 @@ function construct_location_graph(
                 dist * move_cost + dist * noop_cost
             end
             # Add edge between locations
-            add_edge!(graph, i, j, cost == 0 ? eps() : cost)
+            add_edge!(graph, i, j, cost == 0.0 ? eps() : cost)
         end
     end
     return graph
