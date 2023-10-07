@@ -116,33 +116,58 @@ function literal_assistance_naive(
     verbose && println("Computing assistance plans...")
     assist_cmd_plans = Vector{Term}[]
     assist_full_plans = Vector{Term}[]
+    cmd_successes = Bool[]
+    goal_successes = Bool[]
     for cmd in g_commands
         # Compute plan that satisfies command
         verbose && println("Planning for command: $cmd")
+        if !is_command_possible(cmd, domain, state)
+            verbose && println("Command is impossible to satisfy.")
+            cmd_plan = Term[]
+            full_plan = fill(PDDL.no_op, max_steps)
+            push!(assist_cmd_plans, cmd_plan)
+            push!(assist_full_plans, full_plan)
+            push!(cmd_successes, false)
+            push!(goal_successes, false)
+            continue
+        end
         cmd_goals = command_to_goals(cmd; speaker, listener)
         cmd_goal_spec = set_goal_terms(true_goal_spec, cmd_goals)
-        cmd_sol = cmd_planner(domain, state, cmd_goal_spec)
-        if cmd_sol isa NullSolution || cmd_sol.status != :success
-            cmd_plan = Term[]
-            verbose && println("No plan found.")
-        else
-            cmd_plan = collect(cmd_sol)
-            verbose && println("Plan found: $(length(cmd_plan)) actions")
+        cmd_plan = nothing
+        cmd_success = false
+        for trial in (false, true) # Try with and without freezing speaker
+            verbose && println("Speaker is frozen: $trial")
+            tmp_state = copy(state)
+            tmp_state[Compound(:frozen, Term[speaker])] = trial
+            cmd_sol = cmd_planner(domain, tmp_state, cmd_goal_spec)
+            if cmd_sol isa NullSolution || cmd_sol.status != :success
+                cmd_plan = Term[]
+                verbose && println("No plan found.")
+            else
+                cmd_plan = collect(cmd_sol)
+                cmd_success = true
+                verbose && println("Plan found: $(length(cmd_plan)) actions")
+                break
+            end
         end
         push!(assist_cmd_plans, cmd_plan)
+        push!(cmd_successes, cmd_success)
         # Compute remainder that satifies speaker's true goal, freezing listener
         verbose && println("Planning for remainder...")
         cmd_end_state = isempty(cmd_plan) ?
-            state : EndStateSimulator()(domain, state, cmd_plan)
+            copy(state) : EndStateSimulator()(domain, state, cmd_plan)
         cmd_end_state[Compound(:frozen, Term[listener])] = true
         goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
         if goal_sol isa NullSolution || goal_sol.status != :success
             goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
+            goal_success = false
             verbose && println("No plan found.")
         else
             goal_plan = collect(goal_sol)
+            goal_success = true
             verbose && println("Plan found: $(length(goal_plan)) actions")
         end
+        push!(goal_successes, goal_success)
         full_plan = Term[cmd_plan; goal_plan]
         push!(assist_full_plans, full_plan)
     end
@@ -150,17 +175,21 @@ function literal_assistance_naive(
     # Compute average costs of assistance plans
     verbose && println("\nComputing plan costs...")
     assist_plan_cost = min(mean(length.(assist_full_plans)), max_steps)
-    assist_move_cost = map(assist_cmd_plans) do plan
+    assist_move_cost = map(assist_full_plans) do plan
         map(plan) do act
-            act == PDDL.no_op && return 0.0
+            act == PDDL.no_op && return 0.5
             act.name == :no_op && return 0.0
             act.args[1] == listener && return 0.0
             return 1.0
         end |> sum
     end |> mean
+    cmd_success_rate = mean(cmd_successes)
+    goal_success_rate = mean(goal_successes)
     if verbose
         @printf("Average plan cost: %.2f\n", assist_plan_cost)
         @printf("Average speaker move cost: %.2f\n", assist_move_cost)
+        @printf("Command success rate: %.2f\n", cmd_success_rate)
+        @printf("Goal success rate: %.2f\n", goal_success_rate)
     end
     
     return (
@@ -168,6 +197,8 @@ function literal_assistance_naive(
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
         move_cost = assist_move_cost,
+        cmd_success = cmd_success_rate,
+        goal_success = goal_success_rate,
         cmd_plans = assist_cmd_plans,
         full_plans = assist_full_plans,
     )
@@ -198,6 +229,8 @@ function literal_assistance_naive(
     assist_option_probs = zeros(length(assist_objs))
     assist_plan_costs = Float64[]
     assist_move_costs = Float64[]
+    cmd_success_rates = Float64[]
+    goal_success_rates = Float64[]
     sample_probs = Float64[]
     verbose && println("Computing expected values via systematic sampling...")
     # Compute expected assistance options and costs via systematic sampling
@@ -210,10 +243,14 @@ function literal_assistance_naive(
         assist_option_probs .+= result.assist_option_probs .* prob
         push!(assist_plan_costs, result.plan_cost)
         push!(assist_move_costs, result.move_cost)
+        push!(cmd_success_rates, result.cmd_success)
+        push!(goal_success_rates, result.goal_success)
         push!(sample_probs, prob)
     end
     assist_plan_cost = assist_plan_costs' * sample_probs
     assist_move_cost = assist_move_costs' * sample_probs
+    cmd_success_rate = cmd_success_rates' * sample_probs
+    goal_success_rate = goal_success_rates' * sample_probs
     if verbose
         println("Option probabilities:")
         for (obj, prob) in zip(assist_objs, assist_option_probs)
@@ -221,12 +258,16 @@ function literal_assistance_naive(
         end
         @printf("Average plan cost: %.2f\n", assist_plan_cost)
         @printf("Average speaker move cost: %.2f\n", assist_move_cost)
+        @printf("Command success rate: %.2f\n", cmd_success_rate)
+        @printf("Goal success rate: %.2f\n", goal_success_rate)
     end
     return (
         assist_objs = assist_objs,
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
         move_cost = assist_move_cost,
+        cmd_success = cmd_success_rate,
+        goal_success = goal_success_rate,
         sampled_plan_costs = assist_plan_costs,
         sample_probs = sample_probs,
     )
@@ -259,26 +300,37 @@ function literal_assistance_efficient(
     verbose && println("Planning for command: $command")
     cmd_goals = command_to_goals(command; speaker, listener)
     cmd_goal_spec = set_goal_terms(true_goal_spec, cmd_goals)
-    cmd_sol = cmd_planner(domain, state, cmd_goal_spec)
-    if cmd_sol isa NullSolution || cmd_sol.status != :success
-        cmd_plan = Term[]
-        verbose && println("No plan found.")
-    else
-        cmd_plan = collect(cmd_sol)
-        verbose && println("Plan found: $(length(cmd_plan)) actions")
+    cmd_plan = nothing
+    cmd_success = false
+    for trial in (false, true) # Try planning with speaker frozen and unfrozen
+        verbose && println("Speaker is frozen: $trial")
+        tmp_state = copy(state)
+        tmp_state[Compound(:frozen, Term[speaker])] = trial
+        cmd_sol = cmd_planner(domain, tmp_state, cmd_goal_spec)
+        if cmd_sol isa NullSolution || cmd_sol.status != :success
+            cmd_plan = Term[]
+            verbose && println("No plan found.")
+        else
+            cmd_plan = collect(cmd_sol)
+            cmd_success = true
+            verbose && println("Plan found: $(length(cmd_plan)) actions")
+            break
+        end
     end
     
     # Compute remainder that satifies speaker's true goal, freezing listener
     verbose && println("Planning for remainder...")
     cmd_end_state = isempty(cmd_plan) ?
-        state : EndStateSimulator()(domain, state, cmd_plan)
+        copy(state) : EndStateSimulator()(domain, state, cmd_plan)
     cmd_end_state[Compound(:frozen, Term[listener])] = true
     goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
     if goal_sol isa NullSolution || goal_sol.status != :success
         goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
+        goal_success = false
         verbose && println("No plan found.")
     else
         goal_plan = collect(goal_sol)
+        goal_success = true
         verbose && println("Plan found: $(length(goal_plan)) actions")
     end
     full_plan = Term[cmd_plan; goal_plan]
@@ -307,7 +359,7 @@ function literal_assistance_efficient(
     verbose && println("Computing plan cost...")
     assist_plan_cost = min(length(full_plan), max_steps)
     assist_move_cost = map(full_plan) do act
-        act == PDDL.no_op && return 0.0
+        act == PDDL.no_op && return 0.5
         act.name == :no_op && return 0.0
         act.args[1] == listener && return 0.0
         return 1.0
@@ -315,6 +367,8 @@ function literal_assistance_efficient(
     if verbose
         @printf("Plan cost: %.2f\n", assist_plan_cost)
         @printf("Speaker move cost: %.2f\n", assist_move_cost)
+        @printf("Command success: %s\n", cmd_success)
+        @printf("Goal success: %s\n", goal_success)
     end
 
     return (
@@ -322,6 +376,8 @@ function literal_assistance_efficient(
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
         move_cost = assist_move_cost,
+        cmd_success = float(cmd_success),
+        goal_success = float(goal_success),
         cmd_plan = cmd_plan,
         full_plan = full_plan
     )
@@ -352,6 +408,8 @@ function literal_assistance_efficient(
     assist_option_probs = zeros(length(assist_objs))
     assist_plan_costs = Float64[]
     assist_move_costs = Float64[]
+    cmd_success_rates = Float64[]
+    goal_success_rates = Float64[]
     sample_probs = Float64[]
     # Compute expected assistance options and costs via systematic sampling
     verbose && println("Computing expected values via systematic sampling...")
@@ -364,11 +422,15 @@ function literal_assistance_efficient(
         assist_option_probs .+= result.assist_option_probs .* prob
         push!(assist_plan_costs, result.plan_cost)
         push!(assist_move_costs, result.move_cost)
+        push!(cmd_success_rates, result.cmd_success)
+        push!(goal_success_rates, result.goal_success)
         push!(sample_probs, prob)
         verbose && println()
     end
     assist_plan_cost = assist_plan_costs' * sample_probs
     assist_move_cost = assist_move_costs' * sample_probs
+    cmd_success_rate = cmd_success_rates' * sample_probs
+    goal_success_rate = goal_success_rates' * sample_probs
     if verbose
         println("== Expected values ==")
         println("Option probabilities:")
@@ -377,12 +439,16 @@ function literal_assistance_efficient(
         end
         @printf("Plan cost: %.2f\n", assist_plan_cost)
         @printf("Speaker move cost: %.2f\n", assist_move_cost)
+        @printf("Command success rate: %.2f\n", cmd_success_rate)
+        @printf("Goal success rate: %.2f\n", goal_success_rate)
     end
     return (
         assist_objs = assist_objs,
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
         move_cost = assist_move_cost,
+        cmd_success = cmd_success_rate,
+        goal_success = goal_success_rate,
         sampled_plan_costs = assist_plan_costs,
         sample_probs = sample_probs,
     )
@@ -749,7 +815,7 @@ function pragmatic_assistance_offline(
     end
     assist_plan_cost = length(assist_plan)
     assist_move_cost = map(assist_plan) do act
-        act == PDDL.no_op && return 0.0
+        act == PDDL.no_op && return 0.5
         act.name == :no_op && return 0.0
         act.args[1] == listener && return 0.0
         return 1.0

@@ -158,6 +158,31 @@ function ground_command(
     return unique_g_commands
 end
 
+"Statically check if a ground action command is possible in a domain and state."
+function is_command_possible(
+    command::ActionCommand, domain::Domain, state::State;
+    speaker = pddl"(human)", listener = pddl"(robot)",
+    statics = PDDL.infer_static_fluents(domain)
+)
+    possible = true
+    command = pronouns_to_names(command; speaker, listener)
+    for act in command.actions
+        # Substitute and simplify precondition
+        act_schema = PDDL.get_action(domain, act.name)
+        act_vars = PDDL.get_argvars(act_schema)
+        subst = PDDL.Subst(var => val for (var, val) in zip(act_vars, act.args))
+        precond = PDDL.substitute(PDDL.get_precond(act_schema), subst)
+        # Append predicates
+        preconds = append!(PDDL.flatten_conjs(precond), command.predicates)
+        precond = Compound(:and, preconds)
+        # Simplify static terms
+        precond = PDDL.dequantify(precond, domain, state)
+        precond = PDDL.simplify_statics(precond, domain, state, statics)
+        possible = precond.name != false
+    end
+    return possible
+end
+
 "Convert an action command to one or more goal formulas."
 function command_to_goals(
     command::ActionCommand;
