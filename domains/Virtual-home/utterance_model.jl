@@ -9,32 +9,34 @@ include("utils.jl")
 # Example translations from salient actions to instructions/requests
 utterance_examples = [
     # Single assistant actions (no predicates)
-    ("(takeout you plate1)",
+    ("(grab you plate1)",
      "Can you get a plate?"),
-    ("(takeout you cheese1)",
+    ("(grab you cheese1)",
      "Can you go get the cheese?"),
-    ("(takeout you cutleryfork1)",
+    ("(grab you cutleryfork1)",
      "We need a fork."),
     # Multiple assistant actions (distinct)
-    ("(takeout you cutleryfork1) (takeout you cutleryknife1)",
+    ("(grab you cutleryfork1) (grab you cutleryknife1)",
      "Can you get me a fork and knife?"),
-    ("(takeout you carrot1) (takeout you onion1)",
+    ("(grab you carrot1) (grab you onion1)",
      "Hand me the veggies."),
-    ("(takeout you juice1) (takeout you waterglass1)",
+    ("(grab you juice1) (grab you waterglass1)",
      "Give me juice and a glass."),
     # Multiple assistant actions (combined)
-    ("(takeout you cutleryfork1) (takeout you cutleryfork2)",
+    ("(grab you cutleryfork1) (grab you cutleryfork2)",
      "Go get two forks"),
-    ("(takeout you plate1) (takeout you plate2) (takeout you plate3) (takeout you bowl1) (takeout you bowl2) (takeout you bowl3)",
+    ("(grab you plate1) (grab you plate2)",
+     "Go find two plates"),
+    ("(grab you plate1) (grab you plate2) (grab you plate3) (grab you bowl1) (grab you bowl2) (grab you bowl3)",
      "Can you go find three plates and bowls?"),
-    ("(takeout you waterglass1) (takeout you waterglass2) (takeout you waterglass3)",
+    ("(grab you waterglass1) (grab you waterglass2) (grab you waterglass3)",
      "Could you get the waterglasses?"),
     # Joint actions
-    ("(takeout me plate1)(takeout me plate2) (takeout you bowl1)(takeout you bowl2)",
+    ("(grab me plate1)(grab me plate2) (grab you bowl1)(grab you bowl2)",
      "I will find two plates. Can you get the bowls?"),
-    ("(takeout me cutleryfork1) (takeout me cutleryfork2) (takeout me cutleryknife1) (takeout me cutleryknife2)",
+    ("(grab me cutleryfork1) (grab me cutleryfork2) (grab me cutleryknife1) (grab me cutleryknife2)",
      "We need some cutlery for 2 people. I'm picking up forks, can you get knives?"),
-    ("(takeout me chefknife1) (takeout you carrot)",
+    ("(grab me chefknife1) (grab you carrot)",
      "Can you get the carrot from the fridge while I get the knife?")
 ]
 
@@ -84,7 +86,7 @@ function lift_command(
             arg in ignore && return arg
             arg isa Const || return arg
             var = get!(args_to_vars, arg) do
-                type = PDDL.get_objtype(state, arg)
+                type = Symbol(String(arg.name)[1:end-1])
                 count = get(type_count, type, 0) + 1
                 type_count[type] = count
                 name = Symbol(uppercasefirst(string(type)), count)
@@ -271,7 +273,7 @@ end
 
 function extract_focal_objects(
     plan::AbstractVector{<:Term};
-    obj_arg_idxs = Dict(:takeout => 2)
+    obj_arg_idxs = Dict(:grab => 2)
 )
     focal_objs = Term[]
     for act in plan
@@ -308,7 +310,7 @@ end
 function extract_salient_actions(
     domain::Domain, state::State, plan::AbstractVector{<:Term};
     salient_actions = [
-        (:get, 1, 2),
+        (:grab, 1, 2),
     ],
     salient_predicates = []
 )
@@ -339,15 +341,12 @@ end
 function enumerate_salient_actions(
     domain::Domain, state::State;
     salient_actions = [
-        (:pickup, 1, 2),
-        (:handover, 1, 3),
-        (:unlock, 1, 3)
+        (:grab, 1, 2),
     ],
     salient_agents = [
         pddl"(robot)"
     ],
     salient_predicates = [
-        (:iscolor, (d, s, o) -> get_obj_color(s, o))
     ]
 )
     actions = Term[]
@@ -358,20 +357,16 @@ function enumerate_salient_actions(
     for (name, agent_idx, obj_idx) in salient_actions
         act_schema = PDDL.get_action(domain, name)
         # Enumerate over all possible groundings
-        args_iter = PDDL.groundargs(domain, state, act_schema; statics)
+        arg1_iter = PDDL.get_objects(domain, state, PDDL.get_argtypes(act_schema)[1])
+        arg2_iter = PDDL.get_objects(domain, state, PDDL.get_argtypes(act_schema)[2])
+        args_iter = IterTools.product(arg1_iter, arg2_iter)
         for args in args_iter
             # Skip actions with non-salient agents
             agent = args[agent_idx]
             agent in salient_agents || continue
             # Construct action term
+            args = [args[1], args[2], Var(:L)]
             act = Compound(name, collect(Term, args))
-            # Substitute and simplify precondition
-            act_vars = PDDL.get_argvars(act_schema)
-            subst = PDDL.Subst(var => val for (var, val) in zip(act_vars, args))
-            precond = PDDL.substitute(PDDL.get_precond(act_schema), subst)
-            precond = PDDL.simplify_statics(precond, domain, state, statics)
-            # Skip actions that are never possible
-            precond.name == false && continue
             # Add action and agent
             push!(actions, act)
             push!(agents, agent)
@@ -397,7 +392,7 @@ function enumerate_commands(
     predicates::Vector{Vector{Term}};
     speaker = pddl"(human)",
     listener = pddl"(robot)",
-    max_commanded_actions = 3,
+    max_commanded_actions = 4,
     max_distinct_actions = 2,
     exclude_action_chains = true,
     exclude_speaker_only_commands = true
@@ -409,9 +404,11 @@ function enumerate_commands(
     end
     # Enumerate commands of increasing length
     max_commanded_actions = min(max_commanded_actions, length(actions))
+
     for n in 1:max_commanded_actions
         # Iterate over subsets of planned actions
         for idxs in IterTools.subsets(1:length(actions), n)
+            
             # Skip subsets where all actions are speaker actions
             if exclude_speaker_only_commands
                 if all(a == speaker for a in @view(agents[idxs])) continue end
@@ -424,19 +421,19 @@ function enumerate_commands(
                 if n_distinct_actions > max_distinct_actions continue end
             end
             # Skip subsets where future actions depend on previous ones
-            if exclude_action_chains
-                skip = false
-                objects = Set{Const}()
-                for act in @view(actions[idxs]), arg in act.args
-                    (arg == pddl"(you)" || arg == pddl"(me)") && continue
-                    if arg in objects
-                        skip = true
-                        break
-                    end
-                    push!(objects, arg)
-                end
-                skip && continue
-            end
+            # if exclude_action_chains
+            #     skip = false
+            #     objects = Set{Term}()
+            #     for act in @view(actions[idxs]), arg in act.args
+            #         (arg == pddl"(you)" || arg == pddl"(me)") && continue
+            #         if arg in objects
+            #             skip = true
+            #             break
+            #         end
+            #         push!(objects, arg)
+            #     end
+            #     skip && continue
+            # end
             # Add command without predicate modifiers
             cmd = ActionCommand(actions[idxs], Term[])
             push!(commands, cmd)
@@ -521,6 +518,7 @@ end
         end
     end
     # Sample utterance from GPT-3 mixture over prompts
+    # print(prompts)
     utterance ~ gpt3_mixture(prompts)
     return utterance
 end
@@ -562,6 +560,7 @@ end
         end
     end
     # Sample utterance from GPT-3 mixture over prompts
+    print(prompts)
     utterance ~ gpt3_mixture(prompts, probs)
     return utterance
 end

@@ -89,9 +89,10 @@ argument is a regular expression that matches the filenames of each plan.
 function load_plan_dataset(
     dir::AbstractString, pattern::Regex=r"^(\d+)\w?\.(\d+)\..*"
 )
+    # print(dir)
     paths = readdir(dir)
     filter!(path -> endswith(path, ".pddl"), paths)
-    filter!(path -> match(pattern, splitext(path)[1]) !== nothing, paths)
+    # filter!(path -> match(pattern, splitext(path)[1]) !== nothing, paths)
     names = String[]
     plans = Dict{String, Vector{Term}}()
     utterances = Dict{String, Vector{String}}()
@@ -104,6 +105,6 @@ function load_plan_dataset(
         utterances[name] = annotations
         utterance_times[name] = annotation_idxs
     end
-    sort!(names, by = x -> parse.(Int, match(pattern, x).captures))
+    # sort!(names, by = x -> parse.(Int, match(pattern, x).captures))
     return names, plans, utterances, utterance_times
 end

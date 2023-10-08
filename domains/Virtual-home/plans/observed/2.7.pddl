@@ -1,8 +1,2 @@
-(move human cabinet3)
-(noop robot)
-(grab human wineglass1 cabinet3)
-(noop robot)
-(grab human wineglass2 cabinet3)
-(noop robot)
-(grab human wineglass3 cabinet3)
-; Can you get the bottle from fridge?
+(noop human)
+; I'll grab 2 plates for dinner, can you help me find the forks and knives?

@@ -1,5 +1,3 @@
-(move robot table1 fridge1)
+(move robot table1 cabinet5)
 (noop human)
-(grab robot onion1 fridge1)
-(noop human)
-(grab robot carrot1 fridge1)
+(grab robot chefknife1 cabinet5)

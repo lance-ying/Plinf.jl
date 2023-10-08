@@ -1,5 +1,6 @@
-(move human fridge1)
+(move human table1 fridge1)
 (noop robot)
-(grab human juice1 fridge1)
+(grab human chicken1 fridge1)
 (noop robot)
-; Can you get 3 glasses?
+(grab human cucumber1 fridge1)
+; Could you hand me a knife?

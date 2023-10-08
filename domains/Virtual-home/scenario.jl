@@ -1,46 +1,21 @@
 goal_name = ["set_table1", "set_table2","set_table3","set_table4","set_table1b","set_table2b","set_table3b","set_table4b","wine1","wine2","wine3","wine4","wine1p","wine2p","wine3p","wine4p","juice1","juice2","juice3","juice4","juice1p","juice2p","juice3p","juice4p","veggie_salad","chicken_salad","chicken_stew","salmon_stew","potato_stew"]
-costs = (
-    pickup=1.0, grab=1.0, putdown=1.0, noop=0.01, goal=0
-)
-
-pid_dict = Dict("1.1"=>"wine3",
-"2.1"=>"set_table4",
-"2.2"=>"set_table3",
-"2.3"=>"set_table2b",
-"1.2"=>"potato_stew",
-"1.3"=>"juice3",
-"2.4"=>"set_table2b", 
-"1.4"=>"wine3p",
-"1.5"=>"juice3p",
-"2.5"=>"set_table3",
-"2.6"=>"set_table4",
-"1.6"=>"veggie_salad",
-"1.7"=>"chicken_salad",
-"2.7"=>"wine3",
-"1.8"=>"juice4",
-"2.8"=>"set_table3",
-"1.9"=>"wine2",
-"2.9"=>"set_table3",
-"1.10"=>"wine3",
-"1.11"=>"veggie_salad",
-
-)
-goal_dict = Dict()
-
-for i in 1:29
-    goal_dict[goal_name[i]]=goals[i]
-end
 
 
-goals = @pddl("(and (delivered cutleryfork1) (delivered cutleryknife1) (delivered plate1))",
+
+goals = [@pddl("(and (delivered onion1) (delivered cucumber1) (delivered tomato1) (delivered chefknife1))",
+"(and (delivered onion1) (delivered cucumber1) (delivered chicken1) (delivered chefknife1))",
+"(and (delivered onion1) (delivered carrot1) (delivered chicken1) (delivered wine1))",
+"(and (delivered onion1) (delivered carrot1) (delivered salmon1) (delivered wine1))",
+"(and (delivered onion1) (delivered carrot1) (delivered potato1) (delivered wine1))"),
+@pddl("(and (delivered cutleryfork1) (delivered cutleryknife1) (delivered plate1))",
 "(and (delivered cutleryfork1)(delivered cutleryfork2) (delivered cutleryknife1)(delivered cutleryknife2) (delivered plate1)(delivered plate2))",
 "(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3) (delivered plate1)(delivered plate2)(delivered plate3))",
 "(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cutleryfork4) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3)(delivered cutleryknife4) (delivered plate1)(delivered plate2)(delivered plate3)(delivered plate4))",
 "(and (delivered cutleryfork1)(delivered cutleryknife1)(delivered plate1)(delivered bowl1))",
 "(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryknife1)(delivered cutleryknife2) (delivered plate1)(delivered plate2) (delivered bowl1)(delivered bowl2))",
 "(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3) (delivered plate1)(delivered plate2)(delivered plate3) (delivered bowl1)(delivered bowl2)(delivered bowl3))",
-"(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cutleryfork4) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3)(delivered cutleryknife4) (delivered plate1)(delivered plate2)(delivered plate3)(delivered plate4) (delivered bowl1)(delivered bowl2)(delivered bowl3)(delivered bowl4))",
-"(and (delivered wineglass1)(delivered wine1))",
+"(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cutleryfork4) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3)(delivered cutleryknife4) (delivered plate1)(delivered plate2)(delivered plate3)(delivered plate4) (delivered bowl1)(delivered bowl2)(delivered bowl3)(delivered bowl4))"),
+@pddl("(and (delivered wineglass1)(delivered wine1))",
 "(and (delivered wineglass1)(delivered wineglass2) (delivered wine1))",
 "(and (delivered wineglass1)(delivered wineglass2)(delivered wineglass3) (delivered wine1))",
 "(and (delivered wineglass1)(delivered wineglass2)(delivered wineglass3)(delivered wineglass4) (delivered wine1))",
@@ -56,87 +31,82 @@ goals = @pddl("(and (delivered cutleryfork1) (delivered cutleryknife1) (delivere
 "(and (delivered waterglass1)(delivered waterglass2)(delivered cutleryfork1)(delivered cutleryfork2)(delivered cupcake1)(delivered cupcake2)(delivered juice1))",
 "(and (delivered waterglass1)(delivered waterglass2)(delivered waterglass3)(delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cupcake1)(delivered cupcake2)(delivered cupcake3)(delivered juice1))",
 "(and (delivered waterglass1)(delivered waterglass2)(delivered waterglass3)(delivered waterglass4)(delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cutleryfork4)(delivered cupcake1)(delivered cupcake2)(delivered cupcake3)(delivered cupcake4)(delivered juice1))",
-"(and (delivered onion1) (delivered cucumber1) (delivered tomato1) (delivered chefknife1))",
-"(and (delivered onion1) (delivered cucumber1) (delivered chicken1) (delivered chefknife1))",
-"(and (delivered onion1) (delivered carrot1) (delivered chicken1) (delivered wine1))",
-"(and (delivered onion1) (delivered carrot1) (delivered salmon1) (delivered wine1))",
-"(and (delivered onion1) (delivered carrot1) (delivered potato1) (delivered wine1))")
+)]
 
 
-# goals = @pddl("(and (on cutleryfork1 table1) (on cutleryknife1 table1) (on plate1 table1))",
-# "(and (on cutleryfork1 table1)(on cutleryfork2 table1) (on cutleryknife1 table1)(on cutleryknife2 table1) (on plate1 table1)(on plate2 table1))",
-# "(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1) (on cutleryknife1 table1)(on cutleryknife2 table1)(on cutleryknife3 table1) (on plate1 table1)(on plate2 table1)(on plate3 table1))",
-# "(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryfork4 table1) (on cutleryknife1 table1)(on cutleryknife2 table1)(on cutleryknife3 table1)(on cutleryknife4 table1) (on plate1 table1)(on plate2 table1)(on plate3 table1)(on plate4 table1))",
-# "(and (on cutleryfork1 table1)(on cutleryknife1 table1)(on plate1 table1)(on bowl1 table1))",
-# "(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryknife1 table1)(on cutleryknife2 table1) (on plate1 table1)(on plate2 table1) (on bowl1 table1)(on bowl2 table1))",
-# "(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryknife1 table1)(on cutleryknife2 table1)(on cutleryknife3 table1) (on plate1 table1)(on plate2 table1)(on plate3 table1) (on bowl1 table1)(on bowl2 table1)(on bowl3 table1))",
-# "(and (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryfork4 table1) (on cutleryknife1 table1)(on cutleryknife2 table1)(on cutleryknife3 table1)(on cutleryknife4 table1) (on plate1 table1)(on plate2 table1)(on plate3 table1)(on plate4 table1) (on bowl1 table1)(on bowl2 table1)(on bowl3 table1)(on bowl4 table1))",
-# "(and (on wineglass1 table1)(on wine1 table1))",
-# "(and (on wineglass1 table1)(on wineglass2 table1) (on wine1 table1))",
-# "(and (on wineglass1 table1)(on wineglass2 table1)(on wineglass3 table1) (on wine1 table1))",
-# "(and (on wineglass1 table1)(on wineglass2 table1)(on wineglass3 table1)(on wineglass4 table1) (on wine1 table1))",
-# "(and (on wineglass1 table1) (on cutleryfork1 table1)(on wine1 table1)(on cheese1 table1))",
-# "(and (on wineglass1 table1)(on wineglass2 table1) (on cutleryfork1 table1)(on cutleryfork2 table1)(on wine1 table1)(on cheese1 table1))",
-# "(and (on wineglass1 table1)(on wineglass2 table1)(on wineglass3 table1) (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on wine1 table1)(on cheese1 table1))",
-# "(and (on wineglass1 table1)(on wineglass2 table1)(on wineglass3 table1)(on wineglass4 table1) (on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryfork4 table1)(on wine1 table1)(on cheese1 table1))",
-# "(and (on waterglass1 table1)(on juice1 table1))",
-# "(and (on waterglass1 table1)(on waterglass2 table1)(on juice1 table1))",
-# "(and (on waterglass1 table1)(on waterglass2 table1)(on waterglass3 table1)(on juice1 table1))",
-# "(and (on waterglass1 table1)(on waterglass2 table1)(on waterglass3 table1)(on waterglass4 table1)(on juice1 table1))",
-# "(and (on waterglass1 table1)(on cutleryfork1 table1)(on cupcake1 table1)(on juice1 table1))",
-# "(and (on waterglass1 table1)(on waterglass2 table1)(on cutleryfork1 table1)(on cutleryfork2 table1)(on cupcake1 table1)(on cupcake2 table1)(on juice1 table1))",
-# "(and (on waterglass1 table1)(on waterglass2 table1)(on waterglass3 table1)(on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cupcake1 table1)(on cupcake2 table1)(on cupcake3 table1)(on juice1 table1))",
-# "(and (on waterglass1 table1)(on waterglass2 table1)(on waterglass3 table1)(on waterglass4 table1)(on cutleryfork1 table1)(on cutleryfork2 table1)(on cutleryfork3 table1)(on cutleryfork4 table1)(on cupcake1 table1)(on cupcake2 table1)(on cupcake3 table1)(on cupcake4 table1)(on juice1 table1))",
-# "(and (on onion1 table1) (on cucumber1 table1) (on tomato1 table1) (on chefknife1 table1))",
-# "(and (on onion1 table1) (on cucumber1 table1) (on chicken1 table1) (on chefknife1 table1))",
-# "(and (on onion1 table1) (on carrot1 table1) (on chicken1 table1) (on wine1 table1))",
-# "(and (on onion1 table1) (on carrot1 table1) (on salmon1 table1) (on wine1 table1))",
-# "(and (on onion1 table1) (on carrot1 table1) (on potato1 table1) (on wine1 table1))")
+goal_dict = Dict()
+
+for i in 1:29
+    goal_dict[goal_name[i]]=goals[i]
+end
 
 
-action_dict = Dict("1.1"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human wine1 fridge1)","(noop robot)","(move human fridge1 cabinet3)","(noop robot)", "(grab human wineglass1 cabinet3)"),
+pid_dict = Dict("3.1"=>"wine3",
+"2.1"=>"set_table2",
+"2.2"=>"set_table3",
+"2.3"=>"set_table2b",
+"1.1"=>"potato_stew",
+"3.2"=>"juice3",
+"2.4"=>"set_table2b", 
+"3.3"=>"wine3",
+"3.4"=>"juice3p",
+"2.5"=>"set_table3",
+"2.6"=>"set_table2",
+"1.2"=>"veggie_salad",
+"1.3"=>"chicken_salad",
+"3.5"=>"wine3",
+"3.6"=>"juice4",
+"2.7"=>"set_table2",
+"3.7"=>"wine2",
+"2.8"=>"set_table3",
+"3.8"=>"wine3",
+"1.4"=>"veggie_salad",
+
+)
+
+action_dict = Dict("3.1"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human wine1 fridge1)","(noop robot)","(move human fridge1 cabinet3)","(noop robot)", "(grab human wineglass1 cabinet3)"),
 "2.1"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)"),
 "2.2"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)","(noop robot)", "(grab human plate3 cabinet2)"),
 "2.3"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)","(noop robot)","(move human cabinet2 cabinet1)","(noop robot)", "(grab human bowl1 cabinet1)","(noop robot)","(grab human bowl2 cabinet1)","(noop robot)"),
-"1.2"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human potato1 fridge1)","(noop robot)", "(grab human wine1 fridge1)"),
-"1.3"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human juice1 fridge1)","(noop robot)"),
+"1.1"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human potato1 fridge1)","(noop robot)", "(grab human wine1 fridge1)"),
+"3.2"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human juice1 fridge1)","(noop robot)"),
 "2.4"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)","(noop robot)","(move human cabinet2 cabinet4)","(noop robot)", "(grab human cutleryfork1 cabinet4)","(noop robot)","(grab human cutleryfork2 cabinet4)","(noop robot)"),
-"1.4"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)","(move human cabinet2 fridge1)","(noop robot)", "(grab human wine1 fridge1)","(noop robot)", "(grab human cheese1 fridge1)"),
-"1.5"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryfork3 cabinet4)","(noop robot)","(move human cabinet4 fridge1)","(noop robot)", "(grab human juice1 fridge1)"),
+"3.3"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)","(move human cabinet2 fridge1)","(noop robot)", "(grab human wine1 fridge1)","(noop robot)", "(grab human cheese1 fridge1)"),
+"3.4"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryfork3 cabinet4)","(noop robot)","(move human cabinet4 fridge1)","(noop robot)", "(grab human juice1 fridge1)"),
 "2.5"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryfork3 cabinet4)","(noop robot)","(grab human cutleryknife1 cabinet4)","(noop robot)", "(grab human cutleryknife2 cabinet4)","(noop robot)", "(grab human cutleryknife3 cabinet4)" ),
-"2.6"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryfork3 cabinet4)","(noop robot)","(grab human cutleryfork4 cabinet4)","(noop robot)", "(grab human cutleryknife1 cabinet4)","(noop robot)"),
-"1.6"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human tomato1 fridge1)","(noop robot)","(grab human cucumber1 fridge1)","(grab human onion1 fridge1)"),
-"1.7"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human chicken1 fridge1)","(noop robot)","(grab human cucumber1 fridge1)"),
-"2.7"=>@pddl("(move human table1 cabinet3)","(noop robot)","(grab human wineglass1 cabinet3)","(noop robot)","(grab human wineglass2 cabinet3)","(noop robot)","(grab human wineglass3 cabinet3)"),
-"1.8"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human juice1 fridge1)","(noop robot)","(grab human waterglass1 cabinet3)","(noop robot)"),
-"2.8"=>[@pddl("(noop human)")],
-"1.9"=>[@pddl("(noop human)")],
-"2.9"=>[@pddl("(noop human)")],
-"1.10"=>[@pddl("(noop human)")],
-"1.11"=>[@pddl("(noop human)")]
+"2.6"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryknife1 cabinet4)"),
+"1.2"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human tomato1 fridge1)","(noop robot)","(grab human cucumber1 fridge1)","(grab human onion1 fridge1)"),
+"1.3"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human chicken1 fridge1)","(noop robot)","(grab human cucumber1 fridge1)"),
+"3.5"=>@pddl("(move human table1 cabinet3)","(noop robot)","(grab human wineglass1 cabinet3)","(noop robot)","(grab human wineglass2 cabinet3)","(noop robot)","(grab human wineglass3 cabinet3)"),
+"3.6"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human juice1 fridge1)","(noop robot)","(grab human waterglass1 cabinet3)","(noop robot)"),
+"2.7"=>@pddl("(noop human)"),
+"3.7"=>@pddl("(noop human)"),
+"2.8"=>@pddl("(noop human)"),
+"3.8"=>@pddl("(noop human)"),
+"1.4"=>@pddl("(noop human)")
 )
 
 utterance_dict=Dict(
-    "1.1"=>"Can you get 2 more glasses?",
-    "2.1"=>"Can you get more plates and some forks and knives? We have 4 people.",
+    "3.1"=>"Can you get 2 more glasses?",
+    "2.1"=>"Can you fetch some forks and knives?",
     "2.2"=>"I've got the plates, can you get the forks and knives?",
     "2.3"=>"We need some cutleries.",
-    "1.2"=>"Can you get the carrot and onion for the stew?",
-    "1.3"=>"Can you get 3 glasses?",
+    "1.1"=>"Can you get the carrot and onion for the stew?",
+    "3.2"=>"Can you get 3 glasses?",
     "2.4"=>"Can you get the bowls?",
-    "1.4"=>"Can you find 3 forks and some glasses?",
-    "1.5"=>"Can you get the glasses and some cupcakes for afternoon tea?",
+    "3.3"=>"Can you find 3 forks and some glasses?",
+    "3.4"=>"Can you get the glasses and some cupcakes for afternoon tea?",
     "2.5"=>"Can you bring the plates?",
-    "2.6"=>"Could you fetch the rest of the knives and some plates?",
-    "1.6"=>"I need a knife, can you get it?",
-    "1.7"=>"Could you hand me a knife?",
-    "2.7"=>"Can you get the bottle from fridge?",
-    "1.8"=>"We need 3 more glasses, could you get them from the cabinets?",
-    "2.8"=>"I'll grab 3 plates for dinner, can you help me find the forks and knives?",
-    "1.9"=>"I'll get the wine, can you bring me 2 glasses? ",
-    "2.9"=>"We have 3 people for dinner. I'll get the forks and knives, can you get some plates?",
-    "1.10"=>"Can you get wine and glasses for 3 people?",
-    "1.11"=>"I will get the vegetables from the fridge, can you get a knife?"
+    "2.6"=>"Could you fetch one more knife and some plates?",
+    "1.2"=>"I need a knife, can you get it?",
+    "1.3"=>"Could you hand me a knife?",
+    "3.5"=>"Can you get the bottle from fridge?",
+    "3.6"=>"We need 3 more glasses, could you get them from the cabinet?",
+    "2.7"=>"I'll grab 2 plates for dinner, can you help me find the forks and knives?",
+    "3.7"=>"I'll get the wine, can you bring me 2 glasses? ",
+    "2.8"=>"We have 3 people for dinner. I'll get the forks and knives, can you get some plates?",
+    "3.8"=>"I will get wine, can you find glasses for 3 people?",
+    "1.4"=>"I will get the vegetables from the fridge, can you get a knife?"
 )
 
 utterance_dict_literal=Dict(

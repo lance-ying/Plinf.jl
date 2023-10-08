@@ -93,7 +93,7 @@ sol = astar(domain, traj[end], spec)
 show(write_pddl.(sol))
 # plan_dict[pid] = write_pddl.(sol)
 
-for pid in ["2.8","1.9"]
+for pid in ["3.8","2.7","3.7"]
     costs = (human = (
     move=5, grab=1.2, noop=0.6
 ),
@@ -118,13 +118,38 @@ robot = (
 
 end
 
-for pid in ["2.9","1.11"]
+for pid in ["1.4","2.8"]
     costs = (robot = (
     move=8, grab=1.2, noop=0.6
 ),
 
 human = (
     move=8, grab=1, noop=0.6
+))
+    goal = goal_dict[pid_dict[pid]]
+    plan = action_dict[pid]
+    # print(plan)
+    if plan isa Term
+        plan = [plan]
+    end
+    # if length(plan)==1
+    #     plan = pddl"(noop human)"
+    # end
+    traj = PDDL.simulate(domain, state, plan)
+    spec = MinPerAgentActionCosts(goal, costs)
+    sol = astar(domain, traj[end], spec)
+    show(write_pddl.(sol))
+    plan_dict[pid] = write_pddl.(sol)
+
+end
+
+for pid in keys(pid_dict)
+    costs = (robot = (
+    move=8, grab=1, noop=0.6
+),
+
+human = (
+    move=8, grab=8, noop=0.6
 ))
     goal = goal_dict[pid_dict[pid]]
     plan = action_dict[pid]

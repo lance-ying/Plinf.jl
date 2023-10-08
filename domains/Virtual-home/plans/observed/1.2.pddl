@@ -1,6 +1,7 @@
-(move human fridge1)
+(move human table1 fridge1)
 (noop robot)
-(grab human potato1 fridge1)
+(grab human tomato1 fridge1)
 (noop robot)
-(grab human wine1 fridge1)
-; Can you get the carrot and onion for the stew?
+(grab human cucumber1 fridge1)
+(grab human onion1 fridge1)
+; I need a knife, can you get it?

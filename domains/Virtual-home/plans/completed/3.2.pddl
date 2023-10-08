@@ -1,0 +1,8 @@
+(noop human)
+(move robot table1 cabinet3)
+(noop human)
+(grab robot waterglass1 cabinet3)
+(noop human)
+(grab robot waterglass2 cabinet3)
+(noop human)
+(grab robot waterglass3 cabinet3)

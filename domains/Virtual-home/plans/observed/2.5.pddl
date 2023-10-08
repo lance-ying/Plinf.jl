@@ -1,4 +1,4 @@
-(move human cabinet4)
+(move human table1 cabinet4)
 (noop robot)
 (grab human cutleryfork1 cabinet4)
 (noop robot)

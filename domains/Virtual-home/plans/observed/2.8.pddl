@@ -1,2 +1,2 @@
 (noop human)
-; I'll grab 3 plates for dinner, can you help me find the forks and knives?
+; We have 3 people for dinner. I'll get the forks and knives, can you get some plates?

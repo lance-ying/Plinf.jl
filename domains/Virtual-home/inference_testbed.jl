@@ -12,6 +12,7 @@ include("utterance_model.jl")
 include("inference.jl")
 include("render.jl")
 include("callbacks.jl")
+include("scenario.jl")
 
 PDDL.Arrays.@register()
 GLMakie.activate!(inline=false)
@@ -25,16 +26,15 @@ COMPLETION_DIR = joinpath(@__DIR__, "plans", "completed")
 STIMULI_DIR = joinpath(@__DIR__, "stimuli")
 
 # Load domain
-DOMAIN = load_domain(joinpath(@__DIR__, "domain.pddl"))
-COMPILED_DOMAINS = Dict{String, Domain}()
+DOMAIN = load_domain(joinpath(@__DIR__, "domain1.pddl"))
 
 # Load problems
-PROBLEMS = Dict{String, Problem}()
-for path in readdir(PROBLEM_DIR)
-    name, ext = splitext(path)
-    ext == ".pddl" || continue
-    PROBLEMS[name] = load_problem(joinpath(PROBLEM_DIR, path))
-end
+# PROBLEMS = Dict{String, Problem}()
+# for path in readdir(PROBLEM_DIR)
+#     name, ext = splitext(path)
+#     ext == ".pddl" || continue
+#     PROBLEMS[name] = load_problem(joinpath(PROBLEM_DIR, path))
+# end
 
 # Load utterance-annotated plans and completions
 PLAN_IDS, PLANS, UTTERANCES, UTTERANCE_TIMES = load_plan_dataset(PLAN_DIR)
@@ -43,39 +43,29 @@ PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 ## Set-up for specific plan and problem ##
 
 # Select plan and problem
-plan_id = "2.1.keys"
+plan_id = "2.5"
+p = parse(Integer, plan_id[1])
 
 plan = PLANS[plan_id]
 utterances = UTTERANCES[plan_id]
 utterance_times = UTTERANCE_TIMES[plan_id]
 
-assist_type = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[3]
-assist_obj_type = assist_type == "keys" ? :key : :door
-
-problem_id = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[1]
-problem = PROBLEMS[problem_id]
+problem = load_problem(joinpath(@__DIR__, "room2.pddl"))
 
 # Determine true goal from completion
 completion = COMPLETIONS[plan_id]
-true_goal_obj = completion[end].args[2]
-true_goal = Compound(:has, Term[pddl"(human)", true_goal_obj])
+# true_goal_obj = completion[end].args[2]
+true_goal = goal_dict[pid_dict[plan_id]]
 
 # Construct true goal specification
-action_costs = (
-    pickup=1.0, unlock=1.0, handover=1.0, 
-    up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
-)
-true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
 
-# Compile domain for problem
-domain = get!(COMPILED_DOMAINS, problem_id) do
-    state = initstate(DOMAIN, problem)
-    domain, _ = PDDL.compiled(DOMAIN, state)
-    return domain
-end
+# true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
 
-# Construct initial state
-state = initstate(domain, problem)
+state = initstate(DOMAIN, problem)
+
+# Compile and cache domain for faster performance
+domain, state = PDDL.compiled(DOMAIN, state)
+domain = CachedDomain(domain)
 
 # Simulate plan to completion
 plan_end_state = EndStateSimulator()(domain, state, plan)
@@ -86,6 +76,37 @@ plan_end_state = EndStateSimulator()(domain, state, plan)
 commands, command_probs, command_scores =
     literal_command_inference(domain, plan_end_state, utterances[1], verbose=true)
 top_command = commands[1]
+
+
+    # Enumerate over listener-directed commands
+    actions, agents, predicates =
+        enumerate_salient_actions(domain, state; salient_agents=[pddl"robot"])
+    commands =
+        enumerate_commands(actions, agents, predicates; speaker = pddl"human", listener = pddl"robot")
+    # Lift commands and remove duplicates
+    commands = lift_command.(commands, [state])
+    unique!(commands)
+    # Generate constrained trace from literal listener model
+    verbose && println("Evaluating logprobs of observed utterance...")
+    choices = choicemap((:utterance => :output, utterance))
+    trace, _ = generate(literal_utterance_model,
+                        (domain, state, commands), choices)
+    # Extract unnormalized log-probabilities of utterance for each command
+    command_scores = extract_utterance_scores_per_command(trace)
+    # Compute posterior probability of each command
+    verbose && println("Computing posterior over commands...")
+    command_probs = softmax(command_scores)
+    # Sort commands by posterior probability
+    perm = sortperm(command_scores, rev=true)
+    commands = commands[perm]
+    command_probs = command_probs[perm]
+    command_scores = command_scores[perm]
+    # Return commands and their posterior probabilities
+    return (
+        commands = commands,
+        probs = command_probs,
+        scores = command_scores
+    )
 
 # Print top 5 commands and their probabilities
 println("Top 5 most probable commands:")
@@ -125,77 +146,66 @@ expected_efficient_assist_results = literal_assistance_efficient(
 # Set options that vary across runs
 ACT_TEMPERATURE = 1.0
 MODALITIES = (:action, :utterance)
+MODALITIES = (:action)
+goal_names= [["veggie_salad","chicken_salad","chicken_stew","salmon_stew","potato_stew"],
+["set_table1", "set_table2","set_table3","set_table4","set_table1b","set_table2b","set_table3b","set_table4b"],
+["wine1","wine2","wine3","wine4","wine1p","wine2p","wine3p","wine4p","juice1","juice2","juice3","juice4","juice1p","juice2p","juice3p","juice4p"]]
 
-# Define possible goals
-goals = @pddl("(has human gem1)", "(has human gem2)",
-              "(has human gem3)", "(has human gem4)")
-goal_names = ["red", "yellow", "blue", "green"]
+# goals
+
+# # Define possible goals
+# goals = @pddl("(has human gem1)", "(has human gem2)",
+#               "(has human gem3)", "(has human gem4)")
+# goal_names = ["red", "yellow", "blue", "green"]
 
 # Define possible cost profiles
-cost_profiles = [
-    ( # Equal cost profile
-        human = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        ),
-        robot = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        )
+cost_profiles = [ # Equal cost profile
+    (robot = (
+        move=5, grab=1.2, noop=0.6
     ),
-    ( # Human has higher cost for pickup
-        human = (
-            pickup=5.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        ),
-        robot = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        )
-    ),
-    ( # Robot has higher cost for unlock
-        human = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        ),
-        robot = (
-            pickup=1.0, unlock=5.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        )
-    ),
-    ( # Combination of the above
-        human = (
-            pickup=5.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        ),
-        robot = (
-            pickup=1.0, unlock=5.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        )
+
+    human = (
+        move=5, grab=1, noop=0.6
     )
+    ),
+    (robot = (
+        move=5, grab=1, noop=0.6
+    ),
+    
+    human = (
+        move=5, grab=1, noop=0.6
+    )
+    ),
+    (robot = (
+        move=5, grab=1, noop=0.6
+    ),
+    
+    human = (
+        move=5, grab=10, noop=0.6
+    )),
 ]    
 
 # Define goal prior
 @gen function goal_prior()
     # Sample goal index
-    goal ~ uniform_discrete(1, length(goals))
+    goal ~ uniform_discrete(1, length(goals[p]))
     # Sample action costs
     cost_idx ~ uniform_discrete(1, length(cost_profiles))
     costs = cost_profiles[cost_idx]
     # Construct goal specification
-    spec = MinPerAgentActionCosts(Term[goals[goal]], costs)
+    spec = MinPerAgentActionCosts(Term[goals[p][goal]], costs)
     return spec
 end
 
 # Construct iterator over goals and cost profiles for stratified sampling
 goal_addr = :init => :agent => :goal => :goal
 cost_addr = :init => :agent => :goal => :cost_idx
-init_strata = choiceproduct((goal_addr, 1:length(goals)),
+init_strata = choiceproduct((goal_addr, 1:length(goals[p])),
                             (cost_addr, 1:length(cost_profiles)))
 
 # Configure planner
-heuristic = memoized(precomputed(GoalManhattan(), domain, state))
-planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^16)
+heuristic = memoized(precomputed(FFHeuristic(), domain, state))
+planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=1000)
 
 # Define communication and action configuration
 act_config = BoltzmannActConfig(ACT_TEMPERATURE)
@@ -264,18 +274,18 @@ if :utterance in MODALITIES
 end
 
 # Construct callback for logging data and visualizing inference
-renderer = get(renderer_dict, assist_type, RENDERER)
+# renderer = get(renderer_dict, assist_type, RENDERER)
 callback = DKGCombinedCallback(
     renderer, domain;
     goal_addr = goal_addr,
-    goal_names = goal_names,
+    goal_names = goal_names[p],
     goal_colors = gem_colors,
     obs_trajectory = PDDL.simulate(domain, state, plan),
     print_goal_probs = true,
     plot_goal_bars = false,
     plot_goal_lines = false,
-    render = true,
-    inference_overlay = true,
+    render = false,
+    inference_overlay = false,
     record = false
 )
 
