@@ -3,8 +3,8 @@ using PDDL, SymbolicPlanners
 using PDDLViz, GLMakie
 using Test
 
-using Makie.FFMPEG
-import Makie: to_color
+# using Makie.FFMPEG
+# import Makie: to_color
 import PDDLViz: Animation, is_displayed
 
 # Define colors
@@ -149,15 +149,15 @@ renderer_door = PDDLViz.GridworldRenderer(
     )
 )
 
-# Override Makie.convert_video to support GIF loop control
-function Makie.convert_video(input_path, output_path; loop=nothing, video_options...)
-    p, typ = splitext(output_path)
-    format = lstrip(typ, '.')
-    vso = Makie.VideoStreamOptions(; format=format, input=input_path,
-                                   rawvideo=false, video_options...)
-    cmd = Makie.to_ffmpeg_cmd(vso)
-    if format == "gif" && !isnothing(loop) # Append loop setting to options
-        cmd = `$cmd -loop $loop`
-    end
-    Makie.@ffmpeg_env run(`$cmd $output_path`)
-end
+# # Override Makie.convert_video to support GIF loop control
+# function Makie.convert_video(input_path, output_path; loop=nothing, video_options...)
+#     p, typ = splitext(output_path)
+#     format = lstrip(typ, '.')
+#     vso = Makie.VideoStreamOptions(; format=format, input=input_path,
+#                                    rawvideo=false, video_options...)
+#     cmd = Makie.to_ffmpeg_cmd(vso)
+#     if format == "gif" && !isnothing(loop) # Append loop setting to options
+#         cmd = `$cmd -loop $loop`
+#     end
+#     Makie.@ffmpeg_env run(`$cmd $output_path`)
+# end

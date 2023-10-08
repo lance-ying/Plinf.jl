@@ -1,133 +1,129 @@
 (define (domain virtual-home)
     (:requirements :fluents :adl :typing)
     (:types 
-        cutleryknife cutleryfork cutleryspoon bowl chefknife wineglass waterglass plate juice wine cupcake cheese cuttingboard potato beef carrot onion - item
+        ; cutleryknife cutleryfork cutleryspoon bowl chefknife wineglass waterglass plate juice wine cupcake cheese cuttingboard potato beef carrot onion - item
         cabinet fridge - container
+        table container - location
         item table container agent - physical
+        robot human - agent
     )
     (:predicates
-        (has ?i - item) 
-        (offgrid ?i - item)
+        (has ?a - agent ?i - item) 
         (on ?i - item ?t - table)
         (in ?i - item ?c - container)
+        (at ?a - agent ?i - location)
+        (isset2 ?a - item ?b - item)
+        (isset3 ?a - item ?b - item ?c - item)
+        (isset4 ?a - item ?b - item ?c - item ?d - item)
+        ; (taken-by ?a - agent ?i - item)
+        ; (frozen ?a - agent)
+        (active ?a - agent)
+        (next-turn ?a - agent ?b - agent)
     )
-    (:functions
-        (xloc ?o - physical) (yloc ?o - physical) - integer
-        (agentcode ?a - agent) - integer
-        (turn)- integer
-        (walls)- bit-matrix
-    )
-    (:action pickup
-     :parameters (?a - agent ?i - item ?t - table)
-     :precondition (and (not (has ?i)) 
-                            ; (or (and (= (xloc ?a) (xloc ?t)) (= (- (yloc ?a) 1) (yloc ?t)))
-                            ; (and (= (xloc ?a) (xloc ?t)) (= (+ (yloc ?a) 1) (yloc ?t)))
-                            ; (and (= (- (xloc ?a) 1) (xloc ?t)) (= (yloc ?a) (yloc ?t)))
-                            ; (and (= (+ (xloc ?a) 1) (xloc ?t)) (= (yloc ?a) (yloc ?t))))
-                            (on ?i ?t)
-                            ; (= (xloc ?i) (xloc ?t)) (= (yloc ?i) (yloc ?t))(= turn (agentcode ?a))
-                            )
-     :effect (and (has ?i) (offgrid ?i) (not (on ?i ?t))
-                  (assign (xloc ?i) -1) (assign (yloc ?i) -1) (assign turn (- 1 turn)))
-    )
-
-    ; (:action instruct
-    ;  :parameters (?a - agent)
-    ;  :precondition (and (not (has ?i)) 
-    ;                         ; (or (and (= (xloc ?a) (xloc ?t)) (= (- (yloc ?a) 1) (yloc ?t)))
-    ;                         ; (and (= (xloc ?a) (xloc ?t)) (= (+ (yloc ?a) 1) (yloc ?t)))
-    ;                         ; (and (= (- (xloc ?a) 1) (xloc ?t)) (= (yloc ?a) (yloc ?t)))
-    ;                         ; (and (= (+ (xloc ?a) 1) (xloc ?t)) (= (yloc ?a) (yloc ?t))))
-    ;                         (on ?i ?t)
-    ;                         ; (= (xloc ?i) (xloc ?t)) (= (yloc ?i) (yloc ?t))(= turn (agentcode ?a))
-    ;                         )
-    ;  :effect (and (has ?i) (offgrid ?i) (not (on ?i ?t))
-    ;               (assign (xloc ?i) -1) (assign (yloc ?i) -1) (assign turn (- 1 turn)))
-    ; )
-
     ; (:action pickup
-    ;  :parameters (?a - agent ?i - item)
-    ;  :precondition (and (not (has ?a ?i)) 
-    ;                         ; (or (and (= (xloc ?a) (xloc ?t)) (= (- (yloc ?a) 1) (yloc ?t)))
-    ;                         ; (and (= (xloc ?a) (xloc ?t)) (= (+ (yloc ?a) 1) (yloc ?t)))
-    ;                         ; (and (= (- (xloc ?a) 1) (xloc ?t)) (= (yloc ?a) (yloc ?t)))
-    ;                         ; (and (= (+ (xloc ?a) 1) (xloc ?t)) (= (yloc ?a) (yloc ?t))))
-    ;                         ; (on ?i ?t)
-    ;                         (= (xloc ?i) (xloc ?a)) (= (yloc ?i) (yloc ?a))(= turn (agentcode ?a)))
-    ;  :effect (and (has ?a ?i) (offgrid ?i)
-    ;               (assign (xloc ?i) -1) (assign (yloc ?i) -1) (assign turn (- 1 turn)))
+    ;  :parameters (?a - agent ?i - item ?t - table)
+    ;  :precondition (and (active ?a) (not (has ?a ?i)) 
+    ;                         (on ?i ?t)
+    ;                         )
+    ;  :effect (and (has ?a ?i) (not (on ?i ?t))
+    ;               (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+    ;         (not (active ?a)))
     ; )
     (:action takeout
      :parameters (?a - agent ?i - item ?c - container)
-     :precondition (and (not (has ?i)) 
-                            ; (or (and (= (xloc ?a) (xloc ?c)) (= (- (yloc ?a) 1) (yloc ?c)))
-                            ; (and (= (xloc ?a) (xloc ?c)) (= (+ (yloc ?a) 1) (yloc ?c)))
-                            ; (and (= (- (xloc ?a) 1) (xloc ?c)) (= (yloc ?a) (yloc ?c)))
-                            ; (and (= (+ (xloc ?a) 1) (xloc ?c)) (= (yloc ?a) (yloc ?c))))
-                            ; (= (xloc ?i) (xloc ?c)) (= (yloc ?i) (yloc ?t))
-                            (in ?i ?c)
-                            (= turn (agentcode ?a)))
-     :effect (and (has ?i) (offgrid ?i)(not (in ?i ?c))
-                  (assign (xloc ?i) -1) (assign (yloc ?i) -1) (assign turn (- 1 turn)))
+     :precondition (and (active ?a)  (not (has ?a ?i)) 
+                            (in ?i ?c))
+     :effect (and (has ?a ?i) (not (in ?i ?c)) 
+                (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+            (not (active ?a)))
     )
+
+     (:action takeout2
+     :parameters (?a - agent ?i - item ?j - item ?c - container)
+     :precondition (and (active ?a)  (not (has ?a ?i)) (not (has ?a ?j)) 
+                            (in ?i ?c) (in ?j ?c) (isset2 ?i ?j))
+     :effect (and (has ?a ?i)(has ?a ?j) (not (in ?i ?c))  (not (in ?j ?c)) 
+                (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+            (not (active ?a)))
+    )
+
+    ; (:action takeout3
+    ;  :parameters (?a - agent ?i - item ?j - item ?k - item ?c - container)
+    ;  :precondition (and (active ?a)  (not (has ?a ?i)) (not (has ?a ?j)) (not (has ?a ?k)) 
+    ;                          (in ?i ?c) (in ?j ?c) (in ?k ?c) (isset3 ?i ?j ?k))
+    ;  :effect (and (has ?a ?i)(has ?a ?j)(has ?a ?j) (not (in ?i ?c)) (not (in ?j ?c)) (not (in ?k ?c)) 
+    ;             (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+    ;         (not (active ?a)))
+    ; )
+
+    ; (:action takeout4
+    ;  :parameters (?a - agent ?i - item ?j - item ?k - item ?h - item ?c - container)
+    ;  :precondition (and (active ?a) (not (has ?a ?i)) (not (has ?a ?j)) (not (has ?a ?k))  (not (has ?a ?h)) 
+    ;                         (in ?i ?c) (in ?j ?c) (in ?k ?c) (in ?h ?c) (isset4 ?i ?j ?k ?h))
+    ;  :effect (and  (has ?a ?i)(has ?a ?j)(has ?a ?j)(has ?a ?h) (not (in ?i ?c)) (not (in ?j ?c)) (not (in ?k ?c)) (not (in ?h ?c)) 
+    ;             (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+    ;         (not (active ?a)))
+    ; )
+
+    ; (:action putdown
+    ;  :parameters (?a - agent ?i - item ?t - table)
+    ;  :precondition (and (active ?a) (has ?a ?i)
+    ;                         )
+    ;  :effect (and (not (has ?a ?i))(on ?i ?t)
+                  
+    ;               (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+    ;         (not (active ?a))
+    ;         )
+    ; )
+
     (:action putdown
      :parameters (?a - agent ?i - item ?t - table)
-     :precondition (and (has ?i)
-                            ; (or (and (= (xloc ?a) (xloc ?t)) (= (- (yloc ?a) 1) (yloc ?t)))
-                            ; (and (= (xloc ?a) (xloc ?t)) (= (+ (yloc ?a) 1) (yloc ?t)))
-                            ; (and (= (- (xloc ?a) 1) (xloc ?t)) (= (yloc ?a) (yloc ?t)))
-                            ; (and (= (+ (xloc ?a) 1) (xloc ?t)) (= (yloc ?a) (yloc ?t))))
-                            (= turn (agentcode ?a)))
-     :effect (and (not (has ?i)) (not (offgrid ?i))(on ?i ?t)
-                  (assign (xloc ?i) -1) (assign (yloc ?i) -1) (assign turn (- 1 turn)))
+     :precondition (and (active ?a) (has ?a ?i)
+                            )
+     :effect (and (not (has ?a ?i))(on ?i ?t)
+                  (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+            (not (active ?a))
+            )
     )
-    ; (:action putin
-    ;  :parameters (?a - agent ?i - item ?c - container)
-    ;  :precondition (and (not (has ?a ?i))
-    ;                         (or (and (= (xloc ?a) (xloc ?c)) (= (- (yloc ?a) 1) (yloc ?c)))
-    ;                         (and (= (xloc ?a) (xloc ?c)) (= (+ (yloc ?a) 1) (yloc ?c)))
-    ;                         (and (= (- (xloc ?a) 1) (xloc ?c)) (= (yloc ?a) (yloc ?c)))
-    ;                         (and (= (+ (xloc ?a) 1) (xloc ?c)) (= (yloc ?a) (yloc ?c))))
-    ;                         (= turn (agentcode ?a)))
-    ;  :effect (and (not (has ?a ?i)) (not (offgrid ?i))(in ?i ?c)
-    ;               (assign (xloc ?i) -1) (assign (yloc ?i) -1) (assign turn (- 1 turn)))
-    ; )
-    ; (:action up
-    ;  :parameters (?a - agent)
-    ;  :precondition
-    ;     (and (> (yloc ?a) 1) (= turn (agentcode ?a))
-    ;         (= (get-index walls (- (yloc ?a) 1) (xloc ?a)) false)
+
+        (:action putdown2
+     :parameters (?a - agent ?i - item ?j - item ?t - table)
+     :precondition (and (active ?a) (has ?a ?i)(has ?a ?j) (isset2 ?i ?j)
+                            )
+     :effect (and (not (has ?a ?i))(not (has ?a ?j))(on ?i ?t)(on ?j ?t)
+                  
+                  (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+            (not (active ?a))
+            )
+    )
+
+    ;     (:action putdown3
+    ;  :parameters (?a - agent ?i - item ?j - item ?k - item ?t - table)
+    ;  :precondition (and (active ?a) (has ?a ?i)(has ?a ?j)(has ?a ?k) (isset3 ?i ?j ?k)
+    ;                         )
+    ;  :effect (and (not (has ?a ?i))(not (has ?a ?j))(not (has ?a ?k))(on ?i ?t)(on ?j ?t)(on ?k ?t)
+                  
+    ;               (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+    ;         (not (active ?a))
     ;         )
-    ;  :effect (and (decrease (yloc ?a) 1) (assign turn (- 1  turn)))
     ; )
-    ; (:action down
-    ;  :parameters (?a - agent)
-    ;  :precondition
-    ;     (and (< (yloc ?a) (height walls)) (= turn (agentcode ?a))
-    ;         (= (get-index walls (+ (yloc ?a) 1) (xloc ?a)) false)
+
+    ;     (:action putdown4
+    ;  :parameters (?a - agent ?i - item ?j - item ?k - item ?h - item ?t - table)
+    ;  :precondition (and (active ?a)  (has ?a ?i)(has ?a ?j)(has ?a ?k)(has ?a ?h) (isset4 ?i ?j ?k ?h)
+    ;                         )
+    ;  :effect (and (not (has ?a ?i))(not (has ?a ?j))(not (has ?a ?k))(not (has ?a ?h))(on ?i ?t)(on ?j ?t)(on ?k ?t)(on ?h ?t)
+                  
+    ;               (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+    ;         (not (active ?a))
     ;         )
-    ;  :effect(and (increase (yloc ?a) 1) (assign turn (- 1  turn)))
     ; )
-    ; (:action left
-    ;  :parameters (?a - agent)
-    ;  :precondition
-    ;     (and (> (xloc ?a) 1) (= turn (agentcode ?a))
-    ;         (= (get-index walls (yloc ?a) (- (xloc ?a) 1)) false)
-    ;         )
-    ;  :effect (and (decrease (xloc ?a) 1) (assign turn (- 1  turn)))
-    ; )
-    ; (:action right
-    ;  :parameters (?a - agent)
-    ;  :precondition
-    ;     (and (< (xloc ?a) (width walls)) (= turn (agentcode ?a))
-    ;         (= (get-index walls (yloc ?a) (+ (xloc ?a) 1)) false)
-    ;         )
-    ;  :effect (and (increase (xloc ?a) 1) (assign turn (- 1 turn)))
-    ; )
+
+
     (:action noop
      :parameters (?a - agent)
-     :precondition
-     ((= turn (agentcode ?a)))
-     :effect (assign turn (- 1 turn))
+     :precondition (active ?a)
+     :effect (and (forall (?b - agent) (when (next-turn ?a ?b) (active ?b)))
+                  (not (active ?a)))
     )
 )
