@@ -629,7 +629,7 @@ function find_necessary_doors(
 )
     x, y = get_obj_loc(state, agent)
     r_start = room_labels[y, x]
-    x, y = get_obj_loc(state, item)
+    x, y = get_obj_loc(state, item, check_has=true)
     r_goal = room_labels[y, x]
     return find_necessary_doors(domain, state, r_start, r_goal,
                                 room_graph; all_doors)
@@ -699,7 +699,7 @@ function find_necessary_keys_and_doors(
 )
     x, y = get_obj_loc(state, agent)
     r_start = room_labels[y, x]
-    x, y = get_obj_loc(state, item)
+    x, y = get_obj_loc(state, item, check_has=true)
     r_goal = room_labels[y, x]
     return find_necessary_keys_and_doors(domain, state, r_start, r_goal,
                                          room_graph; all_doors, unlockers)

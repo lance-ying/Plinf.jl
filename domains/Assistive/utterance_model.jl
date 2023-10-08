@@ -5,6 +5,7 @@ using Random
 using StatsBase
 
 include("utils.jl")
+include("heuristics.jl")
 
 # Example translations from salient actions to instructions/requests
 utterance_examples = [
@@ -362,18 +363,36 @@ function extract_salient_actions(
     ],
     salient_predicates = [
         (:iscolor, (d, s, o) -> get_obj_color(s, o))
-    ]
+    ],
+    exclude_distal_actions = true
 )
     actions = Term[]
     agents = Const[]
     predicates = Vector{Term}[]
+    # Construct room labels and connectivity graph
+    if exclude_distal_actions
+        room_labels = label_rooms_and_doors(domain, state)
+        room_graph = construct_room_graph(domain, state, room_labels)
+    end
     for act in plan # Extract manually-defined salient actions
         for (name, agent_idx, obj_idx) in salient_actions
             if act.name == name
-                push!(actions, act)
-                push!(agents, act.args[agent_idx])
-                push!(predicates, Term[])
+                agent = act.args[agent_idx]
                 obj = act.args[obj_idx]
+                # Exclude actions about distal objects
+                if exclude_distal_actions
+                    x, y = get_obj_loc(state, agent)
+                    r_agent = room_labels[y, x]
+                    x, y = get_obj_loc(state, obj, check_has=true)
+                    r_obj = room_labels[y, x]
+                    if (r_agent != r_obj &&
+                        !(r_obj in neighbors(room_graph, r_agent)))
+                        continue
+                    end
+                end
+                push!(actions, act)
+                push!(agents, agent)
+                push!(predicates, Term[])
                 for (pred_name, pred_fn) in salient_predicates
                     val = pred_fn(domain, state, obj)
                     if val != pddl"(none)"
@@ -400,7 +419,8 @@ function enumerate_salient_actions(
     ],
     salient_predicates = [
         (:iscolor, (d, s, o) -> get_obj_color(s, o))
-    ]
+    ],
+    exclude_distal_actions = true
 )
     actions = Term[]
     agents = Const[]
@@ -597,6 +617,8 @@ pragmatic_gpt3_mixture = GPT3Mixture(model="curie", stop="\n", max_tokens=64)
     sol = agent_state.plan_state.sol
     spec = convert(Specification, agent_state.goal_state)
     # Rollout planning solution to get future plan
+    planner = copy(planner)
+    planner.max_nodes = 2^16
     plan = rollout_sol(domain, planner, state, sol, spec)
     # Extract salient actions and predicates from plan
     actions, agents, predicates = extract_salient_actions(domain, state, plan)

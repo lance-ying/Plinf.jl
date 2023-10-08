@@ -48,9 +48,13 @@ function get_obj_loc(state::State, obj::Const; check_has::Bool=false)
     y = state[Compound(:yloc, Term[obj])]::Int
     # Check if object is held by an agent, and return agent's location if so
     if check_has && PDDL.get_objtype(state, obj) in (:gem, :key)
-        agents = (PDDL.get_objects(state, :human)...,
-                  PDDL.get_objects(state, :robot)...)
-        for agent in agents
+        for agent in PDDL.get_objects(state, :human)
+            if state[Compound(:has, Term[agent, obj])]
+                x, y = get_obj_loc(state, agent)
+                break
+            end
+        end
+        for agent in PDDL.get_objects(state, :robot)
             if state[Compound(:has, Term[agent, obj])]
                 x, y = get_obj_loc(state, agent)
                 break
@@ -72,7 +76,11 @@ function rollout_sol(
         planner.heuristic = PolicyValueHeuristic(sol)
         search_sol = planner.planner(domain, state, spec)
         planner.heuristic = heuristic
-        return collect(search_sol)
+        if search_sol isa NullSolution
+            return Vector{Compound}()
+        else
+            return collect(Compound, search_sol)
+        end
     elseif sol isa NullSolution # If no solution, return empty vector
         return Vector{Compound}()
     else # Otherwise just rollout the policy greedily
