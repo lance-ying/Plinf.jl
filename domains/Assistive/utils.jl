@@ -68,7 +68,7 @@ end
 function rollout_sol(
     domain::Domain, planner::Planner,
     state::State, sol::Solution, spec::Specification;
-    max_steps::Int = 2^10
+    max_steps::Int = 100
 )
     # Special case handling of RTHS policies
     if planner isa RTHS && sol isa TabularVPolicy
