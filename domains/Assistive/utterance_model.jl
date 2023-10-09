@@ -568,6 +568,23 @@ function extract_utterance_scores_per_command(trace::Trace, addr=:utterance)
     return utt_trace.scores
 end
 
+"Extract command distribution from pragmatic goal inference trace."
+function extract_inferred_commands(trace::Trace, t::Int)
+    step_trace = Gen.static_get_subtrace(trace, Val(:timestep)).subtraces[t]
+    act_trace = step_trace.trie[:act].subtrace_or_retval
+    utt_trace = act_trace.trie[:utterance].subtrace_or_retval
+    prompts = utt_trace.prompts
+    commands = map(prompts) do p
+        isempty(p) ? "" : split(p, "\n")[end-1]
+    end
+    scores = utt_trace.scores
+    perm = sortperm(scores, rev=true)
+    commands = commands[perm]
+    scores = scores[perm]
+    probs = softmax(scores)
+    return commands, scores, probs
+end
+
 # Define GPT-3 mixture generative function for literal utterance model
 literal_gpt3_mixture = GPT3Mixture(model="text-curie-001", stop="\n", max_tokens=64)
 
