@@ -143,7 +143,7 @@ function literal_assistance_naive(
                 verbose && println("No plan found.")
             else
                 cmd_plan = collect(cmd_sol)
-                cmd_success = true
+                cmd_success = length(cmd_plan) <= max_steps
                 verbose && println("Plan found: $(length(cmd_plan)) actions")
                 break
             end
@@ -155,9 +155,13 @@ function literal_assistance_naive(
         cmd_end_state = isempty(cmd_plan) ?
             copy(state) : EndStateSimulator()(domain, state, cmd_plan)
         cmd_end_state[Compound(:frozen, Term[listener])] = true
-        goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
+        if length(cmd_plan) < max_steps
+            goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
+        else
+            goal_sol = NullSolution(:max_depth)
+        end
         if goal_sol isa NullSolution || goal_sol.status != :success
-            goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
+            goal_plan = fill(PDDL.no_op, max(0, max_steps - length(cmd_plan)))
             goal_success = false
             verbose && println("No plan found.")
         else
@@ -310,7 +314,7 @@ function literal_assistance_efficient(
             verbose && println("No plan found.")
         else
             cmd_plan = collect(cmd_sol)
-            cmd_success = true
+            cmd_success = length(cmd_plan) <= max_steps
             verbose && println("Plan found: $(length(cmd_plan)) actions")
             break
         end
@@ -321,9 +325,13 @@ function literal_assistance_efficient(
     cmd_end_state = isempty(cmd_plan) ?
         copy(state) : EndStateSimulator()(domain, state, cmd_plan)
     cmd_end_state[Compound(:frozen, Term[listener])] = true
-    goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
+    if length(cmd_plan) < max_steps
+        goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
+    else
+        goal_sol = NullSolution(:max_depth)
+    end
     if goal_sol isa NullSolution || goal_sol.status != :success
-        goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
+        goal_plan = fill(PDDL.no_op, max(max_steps - length(cmd_plan), 0))
         goal_success = false
         verbose && println("No plan found.")
     else
@@ -487,7 +495,7 @@ function configure_pragmatic_speaker_model(
     end
 
     # Configure planner
-    heuristic = memoized(precomputed(DoorsKeysMSTHeuristic(), domain, state))
+    heuristic = precomputed(DoorsKeysMSTHeuristic(), domain, state)
     planner = RTHS(heuristic=heuristic, n_iters=n_iters, max_nodes=max_nodes)
 
     # Define communication and action configuration
@@ -757,8 +765,9 @@ function pragmatic_assistance_offline(
     end
 
     # Initialize speaker's policy under true goal
-    heuristic = memoized(precomputed(DoorsKeysMSTHeuristic(), domain, state))
-    planner = RTHS(heuristic=heuristic, n_iters=n_iters, max_nodes=max_nodes)
+    heuristic = precomputed(DoorsKeysMSTHeuristic(), domain, state)
+    planner = RTHS(heuristic=heuristic, n_iters=n_iters,
+                   max_nodes=max_nodes, max_time=5)
     true_policy = planner(domain, state, true_goal_spec)
 
     # Iteratively take action that minimizes expected goal achievement cost
