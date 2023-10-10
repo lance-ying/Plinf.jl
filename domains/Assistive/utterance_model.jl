@@ -364,7 +364,8 @@ function extract_salient_actions(
     salient_predicates = [
         (:iscolor, (d, s, o) -> get_obj_color(s, o))
     ],
-    exclude_distal_actions = true
+    exclude_distal_actions = true,
+    all_agents = PDDL.get_objects(domain, state, :agent)
 )
     actions = Term[]
     agents = Const[]
@@ -381,14 +382,18 @@ function extract_salient_actions(
                 obj = act.args[obj_idx]
                 # Exclude actions about distal objects
                 if exclude_distal_actions
-                    x, y = get_obj_loc(state, agent)
-                    r_agent = room_labels[y, x]
-                    x, y = get_obj_loc(state, obj, check_has=true)
-                    r_obj = room_labels[y, x]
-                    if (r_agent != r_obj &&
-                        !(r_obj in neighbors(room_graph, r_agent)))
-                        continue
+                    is_distal = true
+                    for a in all_agents
+                        x, y = get_obj_loc(state, a)
+                        r_agent = room_labels[y, x]
+                        x, y = get_obj_loc(state, obj, check_has=true)
+                        r_obj = room_labels[y, x]
+                        if (r_agent == r_obj ||
+                            r_obj in neighbors(room_graph, r_agent))
+                            is_distal = false
+                        end
                     end
+                    is_distal && continue
                 end
                 push!(actions, act)
                 push!(agents, agent)
@@ -570,7 +575,11 @@ end
 
 "Extract command distribution from pragmatic goal inference trace."
 function extract_inferred_commands(trace::Trace, t::Int)
-    step_trace = Gen.static_get_subtrace(trace, Val(:timestep)).subtraces[t]
+    if t == 0
+        step_trace = Gen.static_get_subtrace(trace, Val(:init))
+    else
+        step_trace = Gen.static_get_subtrace(trace, Val(:timestep)).subtraces[t]
+    end
     act_trace = step_trace.trie[:act].subtrace_or_retval
     utt_trace = act_trace.trie[:utterance].subtrace_or_retval
     prompts = utt_trace.prompts
