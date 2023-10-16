@@ -44,7 +44,7 @@ PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 ## Set-up for specific plan and problem ##
 
 # Select plan and problem
-plan_id = "4.1.keys"
+plan_id = "17.1.doors"
 
 plan = PLANS[plan_id]
 utterances = UTTERANCES[plan_id]
@@ -102,6 +102,7 @@ top_naive_assist_results = literal_assistance_naive(
 )
 
 # Compute expected assistance options and plans via systematic sampling
+
 expected_naive_assist_results = literal_assistance_naive(
     commands, command_probs,
     domain, plan_end_state, true_goal_spec, assist_obj_type;
@@ -124,7 +125,7 @@ expected_efficient_assist_results = literal_assistance_efficient(
 ## Configure agent and world model ##
 
 # Set options that vary across runs
-ACT_TEMPERATURE = 1.0
+ACT_TEMPERATURES = [2.0]
 MODALITIES = (:action, :utterance)
 
 # Define possible goals
@@ -134,43 +135,43 @@ goal_names = ["red", "yellow", "blue", "green"]
 
 # Define possible cost profiles
 cost_profiles = [
-    ( # Equal cost profile
+    ( # Equal cost profile, higher no-op cost
         human = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            pickup=2.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         ),
         robot = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            pickup=2.0, unlock=2.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         )
     ),
-    ( # Human has higher cost for pickup
+    ( # Equal cost profile, lower no-op cost
         human = (
-            pickup=5.0, unlock=1.0, handover=1.0, 
+            pickup=2.0, unlock=1.0, handover=1.0, 
             up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
         ),
         robot = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
+            pickup=2.0, unlock=2.0, handover=1.0, 
             up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
         )
-    ),
-    ( # Robot has higher cost for unlock
+     ),
+    ( # Human costs are higher, higher no-op cost
         human = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            pickup=3.0, unlock=2.0, handover=2.0, 
+            up=2.0, down=2.0, left=2.0, right=2.0, noop=0.9
         ),
         robot = (
-            pickup=1.0, unlock=5.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            pickup=2.0, unlock=2.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         )
     ),
-    ( # Combination of the above
+    ( # Human costs are higher, lower no-op cost
         human = (
-            pickup=5.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+            pickup=3.0, unlock=2.0, handover=2.0, 
+            up=2.0, down=2.0, left=2.0, right=2.0, noop=0.6
         ),
         robot = (
-            pickup=1.0, unlock=5.0, handover=1.0, 
+            pickup=2.0, unlock=2.0, handover=1.0, 
             up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
         )
     )
@@ -188,46 +189,52 @@ cost_profiles = [
     return spec
 end
 
-# Construct iterator over goals and cost profiles for stratified sampling
-goal_addr = :init => :agent => :goal => :goal
-cost_addr = :init => :agent => :goal => :cost_idx
-init_strata = choiceproduct((goal_addr, 1:length(goals)),
-                            (cost_addr, 1:length(cost_profiles)))
-
 # Configure planner
-heuristic = memoized(precomputed(GoalManhattan(), domain, state))
-planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^16)
+heuristic = precomputed(DoorsKeysMSTHeuristic(), domain, state)
+planner = RTHS(heuristic=heuristic, n_iters=2, max_nodes=128)
 
-# Define communication and action configuration
-act_config = BoltzmannActConfig(ACT_TEMPERATURE)
-if :utterance in MODALITIES
-    act_config = CommunicativeActConfig(
-        act_config, # Assume some Boltzmann action noise
-        pragmatic_utterance_model, # Utterance model
-        (domain, planner) # Domain and planner are arguments to utterance model
+# Define agent configuration prior
+@gen function agent_config_prior()
+    temperature ~ uniform_discrete(1, length(ACT_TEMPERATURES))
+    # Define communication and action configuration
+    act_config = BoltzmannActConfig(ACT_TEMPERATURES[temperature])
+    if :utterance in MODALITIES
+        act_config = CommunicativeActConfig(
+            act_config, # Assume some Boltzmann action noise
+            pragmatic_utterance_model, # Utterance model
+            (domain, planner) # Domain and planner are arguments to utterance model
+        )
+    end
+    return AgentConfig(
+        domain, planner;
+        # Assume fixed goal over time
+        goal_config = StaticGoalConfig(goal_prior),
+        # Assume the agent refines its policy at every timestep
+        replan_args = (
+            plan_at_init = true, # Plan at initial timestep
+            prob_replan = 0, # Probability of replanning at each timestep
+            prob_refine = 1.0, # Probability of refining solution at each timestep
+            rand_budget = false # Search budget is fixed everytime
+        ),
+        act_config = act_config
     )
 end
 
-# Define agent configuration
-agent_config = AgentConfig(
-    domain, planner;
-    # Assume fixed goal over time
-    goal_config = StaticGoalConfig(goal_prior),
-    # Assume the agent refines its policy at every timestep
-    replan_args = (
-        plan_at_init = true, # Plan at initial timestep
-        prob_replan = 0, # Probability of replanning at each timestep
-        prob_refine = 1.0, # Probability of refining solution at each timestep
-        rand_budget = false # Search budget is fixed everytime
-    ),
-    act_config = act_config
-)
-
 # Configure world model with agent and environment configuration
 world_config = WorldConfig(
-    agent_config = agent_config,
+    agent_config = agent_config_prior,
     env_config = PDDLEnvConfig(domain, state),
     obs_config = PerfectObsConfig()
+)
+
+# Construct iterator over goals and cost profiles for stratified sampling
+goal_addr = :init => :agent => :goal => :goal
+cost_addr = :init => :agent => :goal => :cost_idx
+temp_addr = :init => :agent_config => :temperature
+init_strata = choiceproduct(
+    (goal_addr, 1:length(goals)),
+    (cost_addr, 1:length(cost_profiles)),
+    (temp_addr, 1:length(ACT_TEMPERATURES))
 )
 
 ## Run inference on observed actions and utterances ##
@@ -269,32 +276,38 @@ if :utterance in MODALITIES
 end
 
 # Construct callback for logging data and visualizing inference
-renderer = get(renderer_dict, assist_type, RENDERER)
-callback = DKGCombinedCallback(
-    renderer, domain;
-    goal_addr = goal_addr,
-    goal_names = goal_names,
-    goal_colors = gem_colors,
-    obs_trajectory = PDDL.simulate(domain, state, plan),
-    print_goal_probs = true,
-    plot_goal_bars = false,
-    plot_goal_lines = false,
-    render = true,
-    inference_overlay = true,
-    record = false
-)
+# renderer = get(renderer_dict, assist_type, RENDERER)
+# callback = DKGCombinedCallback(
+#     renderer, domain;
+#     goal_addr = goal_addr,
+#     goal_names = goal_names,
+#     goal_colors = gem_colors,
+#     obs_trajectory = PDDL.simulate(domain, state, plan),
+#     print_goal_probs = true,
+#     plot_goal_bars = false,
+#     plot_goal_lines = false,
+#     render = true,
+#     inference_overlay = true,
+#     record = false
+# )
 
 # For only data logging and printing, use these callbacks
-# logger_cb = DataLoggerCallback(
-#     t = (t, pf) -> t::Int,
-#     goal_probs = pf -> probvec(pf, goal_addr, 1:length(goals))::Vector{Float64},
-#     lml_est = pf -> log_ml_estimate(pf)::Float64,
-# )
-# print_cb = PrintStatsCallback(
-#     (goal_addr, 1:length(goals));
-#     header="t\t" * join(goal_names, "\t") * "\n"
-# )
-# callback = CombinedCallback(logger=logger_cb, print=print_cb)
+logger_cb = DataLoggerCallback(
+    t = (t, pf) -> t::Int,
+    goal_probs = pf -> probvec(pf, goal_addr, 1:length(goals))::Vector{Float64},
+    cost_probs = pf -> probvec(pf, cost_addr, 1:length(cost_profiles))::Vector{Float64},
+    temp_probs = pf -> probvec(pf, temp_addr, 1:length(ACT_TEMPERATURES))::Vector{Float64},
+    lml_est = pf -> log_ml_estimate(pf)::Float64,
+)
+print_cb = PrintStatsCallback(
+    (goal_addr, 1:length(goals)),
+    (cost_addr, 1:length(cost_profiles)),
+    (temp_addr, 1:length(ACT_TEMPERATURES));
+    header=("t\t" * join(goal_names, "\t") * "\t" *
+            join(["C$C" for C in 1:length(cost_profiles)], "\t") * "\t" *
+            join(["T=$T" for T in ACT_TEMPERATURES], "\t") * "\n")
+)
+callback = CombinedCallback(logger=logger_cb, print=print_cb)
 
 # Configure SIPS particle filter
 sips = SIPS(world_config, resample_cond=:none, rejuv_cond=:none)
@@ -315,9 +328,16 @@ goal_probs = reduce(hcat, goal_probs)
 cost_probs = callback.logger.data[:cost_probs]
 cost_probs = reduce(hcat, cost_probs)
 
+# Extract temperature probabilities
+temp_probs = callback.logger.data[:temp_probs]
+temp_probs = reduce(hcat, temp_probs)
+
 ## Compute pragmatic assistance options and plans ##
 
+true_goal_spec = MinPerAgentActionCosts(Term[true_goal], cost_profiles[1])
+
 pragmatic_assist_results = pragmatic_assistance_offline(
-    pf_state, domain, plan_end_state, true_goal_spec, assist_obj_type;
-    act_temperature = ACT_TEMPERATURE, verbose = true
+    pf_state, domain, plan_end_state,
+    true_goal_spec, completion, assist_obj_type;
+    verbose = true, max_steps=100
 )

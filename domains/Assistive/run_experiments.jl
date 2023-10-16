@@ -49,7 +49,7 @@ GOALS = @pddl("(has human gem1)", "(has human gem2)",
 COST_PROFILES = [
     ( # Equal cost profile, higher no-op cost
         human = (
-            pickup=2.0, unlock=2.0, handover=1.0, 
+            pickup=2.0, unlock=1.0, handover=1.0, 
             up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         ),
         robot = (
@@ -59,7 +59,7 @@ COST_PROFILES = [
     ),
     ( # Equal cost profile, lower no-op cost
         human = (
-            pickup=2.0, unlock=2.0, handover=1.0, 
+            pickup=2.0, unlock=1.0, handover=1.0, 
             up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
         ),
         robot = (
@@ -69,7 +69,7 @@ COST_PROFILES = [
      ),
     ( # Human costs are higher, higher no-op cost
         human = (
-            pickup=3.0, unlock=3.0, handover=2.0, 
+            pickup=3.0, unlock=2.0, handover=2.0, 
             up=2.0, down=2.0, left=2.0, right=2.0, noop=0.9
         ),
         robot = (
@@ -79,7 +79,7 @@ COST_PROFILES = [
     ),
     ( # Human costs are higher, lower no-op cost
         human = (
-            pickup=3.0, unlock=3.0, handover=2.0, 
+            pickup=3.0, unlock=2.0, handover=2.0, 
             up=2.0, down=2.0, left=2.0, right=2.0, noop=0.6
         ),
         robot = (
@@ -107,7 +107,7 @@ N_LITERAL_NAIVE_SAMPLES = 10
 N_LITERAL_EFFICIENT_SAMPLES = 10
 
 # Whether to run literal or pragmatic inference
-RUN_LITERAL = true
+RUN_LITERAL = false
 RUN_PRAGMATIC = true
 
 ## Run experiments ##
@@ -176,7 +176,7 @@ inference_df_path = joinpath(@__DIR__, inference_df_path)
 # inference_df = CSV.read(inference_df_path, DataFrame)
 
 # Iterate over plans
-for plan_id in PLAN_IDS[2:15]
+for plan_id in PLAN_IDS
     println("=== Plan $plan_id ===")
     # Load plan and problem
     plan = PLANS[plan_id]
@@ -239,8 +239,7 @@ for plan_id in PLAN_IDS[2:15]
         end
 
         # Set up planners
-        heuristic = memoized(precomputed(DoorsKeysMSTHeuristic(),
-                                         domain, plan_end_state))
+        heuristic = precomputed(DoorsKeysMSTHeuristic(), domain, plan_end_state)
         cmd_planner = AStarPlanner(heuristic, max_nodes=2^16, verbose=true)
         goal_planner = AStarPlanner(heuristic, max_nodes=2^16, verbose=true)
 
