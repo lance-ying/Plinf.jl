@@ -1,8 +1,6 @@
 using PDDL, SymbolicPlanners
 using Gen, GenParticleFilters
-using Plinf
 using Printf
-using PDDLViz, GLMakie
 
 using GenParticleFilters: softmax
 using SymbolicPlanners: get_goal_terms, set_goal_terms
@@ -145,7 +143,7 @@ function literal_assistance_naive(
                 verbose && println("No plan found.")
             else
                 cmd_plan = collect(cmd_sol)
-                cmd_success = true
+                cmd_success = length(cmd_plan) <= max_steps
                 verbose && println("Plan found: $(length(cmd_plan)) actions")
                 break
             end
@@ -157,9 +155,13 @@ function literal_assistance_naive(
         cmd_end_state = isempty(cmd_plan) ?
             copy(state) : EndStateSimulator()(domain, state, cmd_plan)
         cmd_end_state[Compound(:frozen, Term[listener])] = true
-        goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
+        if length(cmd_plan) < max_steps
+            goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
+        else
+            goal_sol = NullSolution(:max_depth)
+        end
         if goal_sol isa NullSolution || goal_sol.status != :success
-            goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
+            goal_plan = fill(PDDL.no_op, max(0, max_steps - length(cmd_plan)))
             goal_success = false
             verbose && println("No plan found.")
         else
@@ -178,7 +180,7 @@ function literal_assistance_naive(
     assist_move_cost = map(assist_full_plans) do plan
         map(plan) do act
             act == PDDL.no_op && return 0.5
-            act.name == :no_op && return 0.0
+            act.name == :noop && return 0.0
             act.args[1] == listener && return 0.0
             return 1.0
         end |> sum
@@ -312,7 +314,7 @@ function literal_assistance_efficient(
             verbose && println("No plan found.")
         else
             cmd_plan = collect(cmd_sol)
-            cmd_success = true
+            cmd_success = length(cmd_plan) <= max_steps
             verbose && println("Plan found: $(length(cmd_plan)) actions")
             break
         end
@@ -323,9 +325,13 @@ function literal_assistance_efficient(
     cmd_end_state = isempty(cmd_plan) ?
         copy(state) : EndStateSimulator()(domain, state, cmd_plan)
     cmd_end_state[Compound(:frozen, Term[listener])] = true
-    goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
+    if length(cmd_plan) < max_steps
+        goal_sol = goal_planner(domain, cmd_end_state, true_goal_spec)
+    else
+        goal_sol = NullSolution(:max_depth)
+    end
     if goal_sol isa NullSolution || goal_sol.status != :success
-        goal_plan = fill(PDDL.no_op, max_steps - length(cmd_plan))
+        goal_plan = fill(PDDL.no_op, max(max_steps - length(cmd_plan), 0))
         goal_success = false
         verbose && println("No plan found.")
     else
@@ -360,7 +366,7 @@ function literal_assistance_efficient(
     assist_plan_cost = min(length(full_plan), max_steps)
     assist_move_cost = map(full_plan) do act
         act == PDDL.no_op && return 0.5
-        act.name == :no_op && return 0.0
+        act.name == :noop && return 0.0
         act.args[1] == listener && return 0.0
         return 1.0
     end |> sum
@@ -472,7 +478,8 @@ function configure_pragmatic_speaker_model(
     cost_profiles;
     act_temperature = 1.0,
     modalities = (:utterance, :action),
-    max_nodes = 2^16,
+    n_iters = 2,
+    max_nodes = 128,
     kwargs...
 )
     # Define goal prior
@@ -488,8 +495,8 @@ function configure_pragmatic_speaker_model(
     end
 
     # Configure planner
-    heuristic = memoized(precomputed(GoalManhattan(), domain, state))
-    planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=max_nodes)
+    heuristic = precomputed(DoorsKeysMSTHeuristic(), domain, state)
+    planner = RTHS(heuristic=heuristic, n_iters=n_iters, max_nodes=max_nodes)
 
     # Define communication and action configuration
     act_config = BoltzmannActConfig(act_temperature)
@@ -633,8 +640,10 @@ function pragmatic_goal_inference(
         end
     )
     print_cb = PrintStatsCallback(
-        (goal_addr, 1:n_goals);
-        header="t\t" * join(goal_names, "\t") * "\n"
+        (goal_addr, 1:n_goals),
+        (cost_addr, 1:n_costs);
+        header=("t\t" * join(goal_names, "\t") * "\t" *
+                join(["C$C" for C in 1:n_costs], "\t"))
     )
     if verbose
         callback = CombinedCallback(logger=logger_cb, print=print_cb)
@@ -719,22 +728,25 @@ Offline pragmatic assistance model, given a particle filter belief state (`pf`)
 in a `domain` and environment `state`. Simulates the best action to take at
 each timestep via expected cost minimization, where the expectation is taken
 over goal specifications. Returns the distribution over assistance options,
-the assistive plan, and the expected cost of that plan.
+the assistive plan, and the cost of that plan.
 
 Assistance is offline, because the assistant plans ahead based on its current 
 belief about the speaker's goal, instead of updating its belief as it observes
-the speaker's actions.
+the speaker's actions. The assistant assumes the speaker will take the most
+probable action at each timestep, where probabilities are summed across goals.
 """
 function pragmatic_assistance_offline(
     pf::ParticleFilterState,
     domain::Domain, state::State,
     true_goal_spec::Specification,
+    true_plan::AbstractVector{<:Term},
     assist_obj_type::Symbol;
     speaker = pddl"(human)",
     listener = pddl"(robot)",
-    act_temperature = 1.0,
     max_steps::Int = 100,
-    p_thresh::Float64 = 0.001,
+    p_thresh::Float64 = 0.01,
+    n_iters = 2,
+    max_nodes = 512,
     verbose::Bool = false
 )
     # Extract probabilities, specifications and policies from particle filter
@@ -751,78 +763,81 @@ function pragmatic_assistance_offline(
             copy(trace[:timestep => start_t => :agent => :plan].sol)
         end
     end
-    heuristic = memoized(GoalManhattan())
-    planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=2^16)
-    
+
+    # Initialize speaker's policy under true goal
+    heuristic = precomputed(DoorsKeysMSTHeuristic(), domain, state)
+    planner = RTHS(heuristic=heuristic, n_iters=n_iters,
+                   max_nodes=max_nodes, max_time=5)
+    true_policy = planner(domain, state, true_goal_spec)
+
     # Iteratively take action that minimizes expected goal achievement cost
     verbose && println("Planning future actions via pragmatic assistance...")
     assist_plan = Term[]
+    goal_success = false
     for t in (start_t+1):max_steps
-        # Refine policies for each goal, starting from current state
-        for (prob, policy, spec) in zip(probs, policies, goal_specs)
-            prob < p_thresh && continue # Ignore low-probability goals
-            policy = refine!(policy, planner, domain, state, spec)
-        end
-        # Compute Q-values / probabilities for each action
-        act_priorities = Dict{Term, Float64}()
-        for act in available(domain, state)
-            next_state = transition(domain, state, act)
-            act_priorities[act] = 0.0
-            agent = act.args[1]
-            no_op = Compound(:noop, Term[agent])
-            # Compute expected value / probability of action across goals
+        if state[Compound(:active, Term[speaker])]
+            # Try to take action from true plan
+            act = get(true_plan, t - start_t, missing)
+            if ismissing(act) || !available(domain, state, act)
+                # Refine speaker's policy to true goal
+                true_policy = refine!(true_policy, planner, domain, state,
+                                      true_goal_spec)
+                # Take best action
+                act = SymbolicPlanners.best_action(true_policy, state)
+                if ismissing(act)
+                    act = Compound(:noop, Term[speaker])
+                end
+            end
+        else
+            # Refine inferred policies for each goal
             for (prob, policy, spec) in zip(probs, policies, goal_specs)
                 prob < p_thresh && continue # Ignore low-probability goals
-                if agent == listener
+                policy = refine!(policy, planner, domain, state, spec)
+            end
+            # Compute Q-values for each action
+            act_values = Dict{Term, Float64}()
+            for act in available(domain, state)
+                next_state = transition(domain, state, act)
+                act_values[act] = 0.0
+                agent = act.args[1]
+                no_op = Compound(:noop, Term[agent])
+                # Compute expected value / probability of each action across goals
+                for (prob, policy, spec) in zip(probs, policies, goal_specs)
+                    prob < p_thresh && continue # Ignore low-probability goals
                     # Compute expected value of listener actions
                     val = SymbolicPlanners.get_value(policy, state, act)
-                    if val == -Inf # Handle irreversible failures
-                        noop_cost = get_cost(spec, domain, state, no_op, state)
-                        act_cost = get_cost(spec, domain, state, act, next_state)
-                        val = -((max_steps - t) * noop_cost + act_cost)
-                    end
-                elseif get_goal_terms(true_goal_spec) == get_goal_terms(spec)
-                    # Compute probability of speaker actions under true goal
-                    b_policy = BoltzmannPolicy(policy, act_temperature)
-                    val = SymbolicPlanners.get_action_prob(b_policy, state, act)
-                else
-                    val = 0.0
+                    # Ensure Q-values are finite
+                    noop_cost = get_cost(spec, domain, state, no_op, state)
+                    act_cost = get_cost(spec, domain, state, act, next_state)
+                    min_val = -((max_steps - t) * noop_cost + act_cost)
+                    val = max(val, min_val)
+                    act_values[act] += prob * val
                 end
-                act_priorities[act] += prob * val
             end
+            # Take action with highest value
+            act = argmax(act_values)
         end
-        # Take action with highest priority
-        act = argmax(act_priorities)
         push!(assist_plan, act)
         state = transition(domain, state, act)
         verbose && println("$(t-start_t)\t$(write_pddl(act))")
         # Check if goal is satisfied
         if is_goal(true_goal_spec, domain, state)
+            goal_success = true
             verbose && println("Goal satisfied at timestep $(t-start_t).")
-            break
-        end
-        # Check if last two actions were no-ops
-        if (length(assist_plan) >= 2 &&
-            assist_plan[end].name == :noop && assist_plan[end-1].name == :noop)
-            # Fill remaining plan with no-ops
-            while length(assist_plan) < (max_steps - start_t)
-                append!(assist_plan, assist_plan[end-1:end])
-            end
-            assist_plan = assist_plan[1:max_steps-start_t]
-            verbose && println("No-op loop detected, terminating early.")
             break
         end
     end
     assist_plan_cost = length(assist_plan)
     assist_move_cost = map(assist_plan) do act
         act == PDDL.no_op && return 0.5
-        act.name == :no_op && return 0.0
+        act.name == :noop && return 0.0
         act.args[1] == listener && return 0.0
         return 1.0
     end |> sum
     if verbose
         @printf("Plan cost: %d\n", assist_plan_cost)
         @printf("Speaker move cost: %d\n", assist_move_cost)
+        @printf("Goal success: %s\n", goal_success)
     end
     
     # Extract assistance options
@@ -850,6 +865,7 @@ function pragmatic_assistance_offline(
         assist_option_probs = assist_option_probs,
         plan_cost = assist_plan_cost,
         move_cost = assist_move_cost,
-        full_plan = assist_plan        
+        full_plan = assist_plan,
+        goal_success = goal_success
     )
 end

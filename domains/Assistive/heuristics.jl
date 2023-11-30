@@ -647,13 +647,13 @@ function find_necessary_keys(
     domain::Domain, state::State, doors::Vector{Const};
     unlockers = compute_unlockers(domain, state)
 )
-    key_sets = Set{Const}[]
+    key_sets = Vector{Const}[]
     for keys in Iterators.product((unlockers[door] for door in doors)...)
-        key_set = Set(keys)
+        key_set = unique(keys)
         length(key_set) == length(keys) || continue
         push!(key_sets, key_set)
     end
-    return collect.(Const, unique!(key_sets))
+    return unique!(key_sets)
 end
 
 function find_necessary_keys(
@@ -887,9 +887,20 @@ function mst_estim_cost(
     cost = minimum(IterTools.subsets(all_helpers)) do helpers
         objects = [agents; helpers; plan_objects]
         plan_idxs = findall(in(objects), loc_objects)
-        plan_subgraph, _ = induced_subgraph(loc_graph, plan_idxs)
+        plan_subgraph, idx_map = induced_subgraph(loc_graph, plan_idxs)
         min_edges = kruskal_mst(plan_subgraph)
+        # println("  Agents: ", agents)
+        # println("  Helpers: ", helpers)
+        # println("  Plan objects: ", plan_objects)
+        # println("Edges: ")
+        # for edge in min_edges
+        #     obj_i = loc_objects[idx_map[edge.src]]
+        #     obj_j = loc_objects[idx_map[edge.dst]]
+        #     println("  ", obj_i, " -> ", obj_j)
+        #     println("  ", idx_map[edge.src], " -> ", idx_map[edge.dst])
+        # end
         if length(min_edges) < nv(plan_subgraph) - 1
+            # println("Warning: MST not found.")
             return Inf
         else
             total_weight = 0.0

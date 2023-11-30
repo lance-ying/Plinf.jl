@@ -47,50 +47,50 @@ GOALS = @pddl("(has human gem1)", "(has human gem2)",
 
 # Possible cost profiles
 COST_PROFILES = [
-    ( # Equal cost profile
+    ( # Equal cost profile, higher no-op cost
         human = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
+            pickup=2.0, unlock=1.0, handover=1.0, 
             up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         ),
         robot = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
+            pickup=2.0, unlock=2.0, handover=1.0, 
             up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         )
     ),
-    ( # Human has higher cost for pickup
+    ( # Equal cost profile, lower no-op cost
         human = (
-            pickup=5.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
+            pickup=2.0, unlock=1.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
         ),
         robot = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
+            pickup=2.0, unlock=2.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
+        )
+     ),
+    ( # Human costs are higher, higher no-op cost
+        human = (
+            pickup=3.0, unlock=2.0, handover=2.0, 
+            up=2.0, down=2.0, left=2.0, right=2.0, noop=0.9
+        ),
+        robot = (
+            pickup=2.0, unlock=2.0, handover=1.0, 
             up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
         )
     ),
-    ( # Robot has higher cost for unlock
+    ( # Human costs are higher, lower no-op cost
         human = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
+            pickup=3.0, unlock=2.0, handover=2.0, 
+            up=2.0, down=2.0, left=2.0, right=2.0, noop=0.6
         ),
         robot = (
-            pickup=1.0, unlock=5.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
-        )
-    ),
-    ( # Combination of the above
-        human = (
-            pickup=5.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
-        ),
-        robot = (
-            pickup=1.0, unlock=5.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.9
+            pickup=2.0, unlock=2.0, handover=1.0, 
+            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
         )
     )
 ]
 
 # Boltzmann action temperatures
-ACT_TEMPERATURES = [1.0]
+ACT_TEMPERATURES = [2.0]
 
 # Possible modalities
 MODALITIES = [
@@ -107,8 +107,8 @@ N_LITERAL_NAIVE_SAMPLES = 10
 N_LITERAL_EFFICIENT_SAMPLES = 10
 
 # Whether to run literal or pragmatic inference
-RUN_LITERAL = true
-RUN_PRAGMATIC = false
+RUN_LITERAL = false
+RUN_PRAGMATIC = true
 
 ## Run experiments ##
 
@@ -134,6 +134,9 @@ df = DataFrame(
     lml_est = Float64[],
     # Assistance results
     top_command = String[],
+    top_command_prob = Float64[],
+    top_5_commands = String[],
+    top_5_command_probs = String[],
     assist_probs_1 = Float64[],
     assist_probs_2 = Float64[],
     assist_probs_3 = Float64[],
@@ -147,8 +150,30 @@ df = DataFrame(
     assist_move_cost = Float64[]
 )
 datetime = Dates.format(Dates.now(), "yyyy-mm-ddTHH-MM-SS")
-df_path = "literal_experiments_$(datetime).csv"
+df_types = eltype.(eachcol(df))
+df_path = "experiments_$(datetime).csv"
 df_path = joinpath(@__DIR__, df_path)
+# df = CSV.read(df_path, DataFrame)
+
+inference_df = DataFrame(
+    # Plan info
+    plan_id = String[],
+    problem_id = String[],
+    assist_type = String[],
+    true_goal = String[],
+    # Method info
+    act_temperature = Float64[],
+    # Inference results
+    timestep = Int64[],
+    lml_est = Float64[];
+    (Symbol("goal_probs_$(i)") => Float64[] for i in 1:length(GOALS))...,
+    (Symbol("act_goal_probs_$(i)") => Float64[] for i in 1:length(GOALS))...,
+    (Symbol("utt_goal_probs_$(i)") => Float64[] for i in 1:length(GOALS))...,
+    (Symbol("cost_probs_$(i)") => Float64[] for i in 1:length(GOALS))...,
+)
+inference_df_path = "inferences_per_timestep_$(datetime).csv"
+inference_df_path = joinpath(@__DIR__, inference_df_path)
+# inference_df = CSV.read(inference_df_path, DataFrame)
 
 # Iterate over plans
 for plan_id in PLAN_IDS
@@ -173,13 +198,6 @@ for plan_id in PLAN_IDS
     # Construct true goal specification
     action_costs = COST_PROFILES[1]
     true_goal_spec = MinPerAgentActionCosts(Term[true_goal], action_costs)
-
-    # Select cost profiles based on assistance type
-    if assist_type == "doors"
-        cost_profiles = COST_PROFILES[2:2]
-    elseif assist_type == "keys"
-        cost_profiles = COST_PROFILES[4:4]
-    end
 
     # Compile domain for problem
     domain = get!(COMPILED_DOMAINS, problem_id) do
@@ -221,8 +239,7 @@ for plan_id in PLAN_IDS
         end
 
         # Set up planners
-        heuristic = memoized(precomputed(DoorsKeysMSTHeuristic(),
-                                         domain, plan_end_state))
+        heuristic = precomputed(DoorsKeysMSTHeuristic(), domain, plan_end_state)
         cmd_planner = AStarPlanner(heuristic, max_nodes=2^16, verbose=true)
         goal_planner = AStarPlanner(heuristic, max_nodes=2^16, verbose=true)
 
@@ -232,6 +249,10 @@ for plan_id in PLAN_IDS
         entry[:modalities] = "utterance"
         entry[:act_temperature] = 0.0
         entry[:top_command] = repr("text/plain", top_command)
+        entry[:top_command_prob] = command_probs[1]
+        entry[:top_5_commands] =
+            join([repr("text/plain", c) for c in commands[1:5]], "\n")
+        entry[:top_5_command_probs] = string(command_probs[1:5])
         for i in 1:6
             entry[Symbol("assist_probs_$i")] = 0.0
         end
@@ -274,6 +295,7 @@ for plan_id in PLAN_IDS
             entry[Symbol("assist_probs_$i")] = p
         end
         push!(df, entry, cols=:union)
+        GC.gc()
 
         # Compute efficient assistance options and plans for top command
         println()
@@ -342,7 +364,7 @@ for plan_id in PLAN_IDS
 
             # Configure pragmatic speaker/agent model
             model_config = configure_pragmatic_speaker_model(
-                domain, state, GOALS, cost_profiles;
+                domain, state, GOALS, COST_PROFILES;
                 modalities=(:action, :utterance), act_temperature
             )
 
@@ -350,17 +372,36 @@ for plan_id in PLAN_IDS
             println()
             println("Running pragmatic goal inference...")
             pragmatic_inference_results = pragmatic_goal_inference(
-                model_config, length(GOALS), length(cost_profiles),
+                model_config, length(GOALS), length(COST_PROFILES),
                 plan, utterances, utterance_times,
                 verbose = true
             )
+
+            # Store inference results per timestep
+            rs = pragmatic_inference_results
+            n_steps = length(plan) + 1
+            new_inference_df = DataFrame(
+                plan_id = fill(plan_id, n_steps),
+                problem_id = fill(problem_id, n_steps),
+                assist_type = fill(assist_type, n_steps),
+                true_goal = fill(string(true_goal_obj), n_steps),
+                act_temperature = fill(act_temperature, n_steps),
+                timestep = 0:(n_steps-1),
+                lml_est = rs.lml_est_history;
+                (Symbol("goal_probs_$(i)") => rs.goal_probs_history[i, :] for i in 1:length(GOALS))...,
+                (Symbol("act_goal_probs_$(i)") => rs.action_goal_probs_history[i, :] for i in 1:length(GOALS))...,
+                (Symbol("utt_goal_probs_$(i)") => rs.utterance_goal_probs_history[i, :] for i in 1:length(GOALS))...,
+                (Symbol("cost_probs_$(i)") => rs.cost_probs_history[i, :] for i in 1:length(COST_PROFILES))...,
+            )
+            append!(inference_df, new_inference_df, cols=:union)
+            CSV.write(inference_df_path, inference_df)
 
             for modalities in MODALITIES
                 println()
                 println("Modalities: $modalities")
                 entry[:modalities] = join(collect(modalities), ", ")
 
-                # Store inference results
+                # Store inference results for modality
                 goal_probs = if modalities == (:action,)
                     pragmatic_inference_results.action_goal_probs
                 elseif modalities == (:utterance,)
@@ -389,13 +430,14 @@ for plan_id in PLAN_IDS
                 end
                 pragmatic_assist_results = pragmatic_assistance_offline(
                     pf, domain, plan_end_state,
-                    true_goal_spec, assist_obj_type;
-                    verbose = true, max_steps = MAX_STEPS, 
-                    act_temperature
+                    true_goal_spec, completion, assist_obj_type;
+                    verbose = true, max_steps = MAX_STEPS
                 )
                 entry[:assist_plan] =
                     join(write_pddl.(pragmatic_assist_results.full_plan), "\n")
                 entry[:assist_plan_cost] = pragmatic_assist_results.plan_cost
+                entry[:assist_move_cost] = pragmatic_assist_results.move_cost
+                entry[:goal_success] = float(pragmatic_assist_results.goal_success)
                 for (i, p) in enumerate(pragmatic_assist_results.assist_option_probs)
                     entry[Symbol("assist_probs_$i")] = p
                 end
