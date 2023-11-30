@@ -9,5 +9,4 @@
 (grab human cutleryfork1 cabinet4)
 (noop robot)
 (grab human cutleryfork2 cabinet4)
-(noop robot)
-; Can you get the bowls?
+; Can you fetch the knives?

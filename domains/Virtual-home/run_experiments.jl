@@ -18,13 +18,14 @@ PDDL.Arrays.@register()
 
 # Define directory paths
 PROBLEM_DIR = joinpath(@__DIR__, "problems")
-PLAN_DIR = joinpath(@__DIR__, "plans", "observed")
-COMPLETION_DIR = joinpath(@__DIR__, "plans", "completed")
+PLAN_DIR = joinpath(@__DIR__, "plans", "observed","2")
+COMPLETION_DIR = joinpath(@__DIR__, "plans", "completed","2")
 STIMULI_DIR = joinpath(@__DIR__, "stimuli")
 
 # Load domain
-DOMAIN = load_domain(joinpath(@__DIR__, "domain.pddl"))
+DOMAIN = load_domain(joinpath(@__DIR__, "domain1.pddl"))
 COMPILED_DOMAINS = Dict{String, Domain}()
+
 
 # Load problems
 PROBLEMS = Dict{String, Problem}()
@@ -41,55 +42,37 @@ PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 ## Define parameters ##
 
 # Possible goals
-GOALS = @pddl("(has human gem1)", "(has human gem2)",
-              "(has human gem3)", "(has human gem4)")
+GOALS = goals[2]
 
 # Possible cost profiles
-COST_PROFILES = [
-    ( # Equal cost profile
-        human = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        ),
-        robot = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        )
-    ),
-    ( # Human has higher cost for pickup
-        human = (
-            pickup=5.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        ),
-        robot = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        )
-    ),
-    ( # Robot has higher cost for unlock
-        human = (
-            pickup=1.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        ),
-        robot = (
-            pickup=1.0, unlock=5.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        )
-    ),
-    ( # Combination of the above
-        human = (
-            pickup=5.0, unlock=1.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        ),
-        robot = (
-            pickup=1.0, unlock=5.0, handover=1.0, 
-            up=1.0, down=1.0, left=1.0, right=1.0, noop=0.6
-        )
-    )
-]
+COST_PROFILES = [ # Equal cost profile
+(robot = (
+    move=5, grab=1.2, noop=0.6
+),
+
+human = (
+    move=5, grab=1, noop=0.6
+)
+),
+(robot = (
+    move=5, grab=1, noop=0.6
+),
+
+human = (
+    move=5, grab=1, noop=0.6
+)
+),
+(robot = (
+    move=5, grab=1, noop=0.6
+),
+
+human = (
+    move=5, grab=10, noop=0.6
+)),
+]    
 
 # Boltzmann action temperatures
-ACT_TEMPERATURES = [1.0]
+ACT_TEMPERATURES = [0.2]
 
 # Possible modalities
 MODALITIES = [
@@ -99,6 +82,7 @@ MODALITIES = [
 ]
 
 # Maximum number of steps before time is up
+
 MAX_STEPS = 100
 
 # Number of samples for systematic sampling
@@ -128,6 +112,10 @@ df = DataFrame(
     goal_probs_2 = Float64[],
     goal_probs_3 = Float64[],
     goal_probs_4 = Float64[],
+    goal_probs_5 = Float64[],
+    goal_probs_6 = Float64[],
+    goal_probs_7 = Float64[],
+    goal_probs_8 = Float64[],
     true_goal_probs = Float64[],
     brier_score = Float64[],
     lml_est = Float64[],
@@ -139,15 +127,25 @@ df = DataFrame(
     assist_probs_4 = Float64[],
     assist_probs_5 = Float64[],
     assist_probs_6 = Float64[],
+    assist_probs_7 = Float64[],
+    assist_probs_8 = Float64[],
+    assist_probs_9 = Float64[],
+    assist_probs_10 = Float64[],
+    assist_probs_11 = Float64[],
+    assist_probs_12 = Float64[],
+    assist_probs_13 = Float64[],
+    assist_probs_14 = Float64[],
+    assist_probs_15 = Float64[],
+    assist_probs_16 = Float64[],
     assist_plan = String[],
     assist_plan_cost = Float64[]
 )
 datetime = Dates.format(Dates.now(), "yyyy-mm-ddTHH-MM-SS")
-df_path = "experiments_$(datetime).csv"
+df_path = "experiments_1.csv"
 df_path = joinpath(@__DIR__, df_path)
 
 # Iterate over plans
-for plan_id in PLAN_IDS[3:end]
+for plan_id in PLAN_IDS[1:end]
     println("=== Plan $plan_id ===")
     # Load plan and problem
     plan = PLANS[plan_id]
@@ -155,27 +153,28 @@ for plan_id in PLAN_IDS[3:end]
     utterance_times = UTTERANCE_TIMES[plan_id]
     println(utterances)
 
-    assist_type = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[3]
-    assist_obj_type = assist_type == "keys" ? :key : :door
+    assist_type = "items"
+    assist_obj_type = :item
 
-    problem_id = match(r"(\d+\w?).(\d+)\.(\w+)", plan_id).captures[1]
+    problem_id = match(r"(\d+?).(\d+)", plan_id).captures[1]
     problem = PROBLEMS[problem_id]
 
     # Determine true goal from completion
     completion = COMPLETIONS[plan_id]
     true_goal_obj = completion[end].args[2]
-    true_goal = Compound(:has, Term[pddl"(human)", true_goal_obj])
+    true_goal = goal_dict[pid_dict[plan_id]]
+    # print(true_goal)
 
     # Construct true goal specification
-    action_costs = COST_PROFILES[1][1]
+    action_costs = (
+    move=5, grab=1.2, noop=0.6
+)
     true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
 
+    # print(true_goal_spec)
+
+    cost_profiles = COST_PROFILES
     # Sellect cost profiles based on assistance type
-    if assist_type == "doors"
-        cost_profiles = COST_PROFILES[2:2]
-    elseif assist_type == "keys"
-        cost_profiles = COST_PROFILES[4:4]
-    end
 
     # Compile domain for problem
     domain = get!(COMPILED_DOMAINS, problem_id) do
@@ -195,7 +194,7 @@ for plan_id in PLAN_IDS[3:end]
     plan_entry = Dict{Symbol, Any}(
         :plan_id => plan_id,
         :problem_id => problem_id,
-        :assist_type => assist_type,
+        :assist_type => "items",
         :true_goal => string(true_goal_obj),
     )
 
@@ -217,8 +216,8 @@ for plan_id in PLAN_IDS[3:end]
         end
 
         # Set up planners
-        cmd_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16)
-        goal_planner = AStarPlanner(GoalManhattan(), max_nodes=2^16)
+        cmd_planner = AStarPlanner(FFHeuristic(), max_nodes=10000)
+        goal_planner = AStarPlanner(FFHeuristic(), max_nodes=10000)
 
         # Set up dataframe entry        
         entry = copy(plan_entry)
@@ -246,20 +245,20 @@ for plan_id in PLAN_IDS[3:end]
         push!(df, entry, cols=:union)
 
         # Compute expected assistance options and plans via systematic sampling
-        println()
-        mean_naive_assist_results = literal_assistance_naive(
-            commands, command_probs,
-            domain, plan_end_state, true_goal_spec, assist_obj_type;
-            cmd_planner, goal_planner, max_steps = remain_steps,
-            verbose = true, n_samples = N_LITERAL_NAIVE_SAMPLES
-        )
-        entry[:estim_type] = "mean"
-        entry[:assist_plan] = ""
-        entry[:assist_plan_cost] = mean_naive_assist_results.plan_cost
-        for (i, p) in enumerate(mean_naive_assist_results.assist_option_probs)
-            entry[Symbol("assist_probs_$i")] = p
-        end
-        push!(df, entry, cols=:union)
+        # println()
+        # mean_naive_assist_results = literal_assistance_naive(
+        #     commands, command_probs,
+        #     domain, plan_end_state, true_goal_spec, assist_obj_type;
+        #     cmd_planner, goal_planner, max_steps = remain_steps,
+        #     verbose = true, n_samples = N_LITERAL_NAIVE_SAMPLES
+        # )
+        # entry[:estim_type] = "mean"
+        # entry[:assist_plan] = ""
+        # entry[:assist_plan_cost] = mean_naive_assist_results.plan_cost
+        # for (i, p) in enumerate(mean_naive_assist_results.assist_option_probs)
+        #     entry[Symbol("assist_probs_$i")] = p
+        # end
+        # push!(df, entry, cols=:union)
 
         # Compute efficient assistance options and plans for top command
         println()
@@ -278,20 +277,20 @@ for plan_id in PLAN_IDS[3:end]
         push!(df, entry, cols=:union)
 
         # Compute expected assistance options and plans via systematic sampling
-        println()
-        mean_efficient_assist_results = literal_assistance_efficient(
-            commands, command_probs,
-            domain, plan_end_state, true_goal_spec, assist_obj_type;
-            cmd_planner, goal_planner, max_steps = remain_steps,
-            verbose = true, n_samples = N_LITERAL_EFFICIENT_SAMPLES
-        )
-        entry[:estim_type] = "mean"
-        entry[:assist_plan] = ""
-        entry[:assist_plan_cost] = mean_efficient_assist_results.plan_cost
-        for (i, p) in enumerate(mean_efficient_assist_results.assist_option_probs)
-            entry[Symbol("assist_probs_$i")] = p
-        end
-        push!(df, entry, cols=:union)
+        # println()
+        # mean_efficient_assist_results = literal_assistance_efficient(
+        #     commands, command_probs,
+        #     domain, plan_end_state, true_goal_spec, assist_obj_type;
+        #     cmd_planner, goal_planner, max_steps = remain_steps,
+        #     verbose = true, n_samples = N_LITERAL_EFFICIENT_SAMPLES
+        # )
+        # entry[:estim_type] = "mean"
+        # entry[:assist_plan] = ""
+        # entry[:assist_plan_cost] = top_efficient_assist_results.plan_cost
+        # for (i, p) in enumerate(top_efficient_assist_results.assist_option_probs)
+        #     entry[Symbol("assist_probs_$i")] = p
+        # end
+        # push!(df, entry, cols=:union)
 
         GC.gc()
         CSV.write(df_path, df)
@@ -350,6 +349,7 @@ for plan_id in PLAN_IDS[3:end]
                     entry[Symbol("goal_probs_$i")] = p
                 end
                 true_goal_idx = findfirst(==(true_goal), GOALS)
+                
                 entry[:true_goal_probs] = goal_probs[true_goal_idx]
                 entry[:brier_score] =
                     sum((goal_probs .- (1:length(GOALS) .== true_goal_idx)).^2)

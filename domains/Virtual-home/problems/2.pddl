@@ -3,7 +3,8 @@
   (:objects 
             cutleryfork1 cutleryfork2 cutleryfork3 cutleryfork4
             cutleryknife1 cutleryknife2 cutleryknife3 cutleryknife4
-            bowl1 bowl2 bowl3 bowl4 plate1 plate2 plate3 plate4  - item
+            plate1 plate2 plate3 plate4
+            bowl1 bowl2 bowl3 bowl4  - item
             table1 - table
             robot - robot
             human - human
@@ -30,5 +31,5 @@
          (in cutleryknife3 cabinet4)
          (in cutleryknife4 cabinet4)
         )
-  (:goal (has human wine1))
+  (:goal (has human plate1))
 )

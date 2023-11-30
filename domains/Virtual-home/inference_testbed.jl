@@ -21,8 +21,8 @@ GLMakie.activate!(inline=false)
 
 # Define directory paths
 # PROBLEM_DIR = joinpath(@__DIR__, "problems")
-PLAN_DIR = joinpath(@__DIR__, "plans", "observed")
-COMPLETION_DIR = joinpath(@__DIR__, "plans", "completed")
+PLAN_DIR = joinpath(@__DIR__, "plans", "observed","2")
+COMPLETION_DIR = joinpath(@__DIR__, "plans", "completed","2")
 STIMULI_DIR = joinpath(@__DIR__, "stimuli")
 
 # Load domain
@@ -50,7 +50,7 @@ plan = PLANS[plan_id]
 utterances = UTTERANCES[plan_id]
 utterance_times = UTTERANCE_TIMES[plan_id]
 
-problem = load_problem(joinpath(@__DIR__, "room2.pddl"))
+problem = load_problem(joinpath(@__DIR__, "problems/$(plan_id[1]).pddl"))
 
 # Determine true goal from completion
 completion = COMPLETIONS[plan_id]
@@ -58,8 +58,11 @@ completion = COMPLETIONS[plan_id]
 true_goal = goal_dict[pid_dict[plan_id]]
 
 # Construct true goal specification
+action_costs = (
+    move=5, grab=1.2, noop=0.6
+)
 
-# true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
+true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
 
 state = initstate(DOMAIN, problem)
 
@@ -74,7 +77,7 @@ plan_end_state = EndStateSimulator()(domain, state, plan)
 
 # Infer distribution over commands
 commands, command_probs, command_scores =
-    literal_command_inference(domain, plan_end_state, utterances[1], verbose=true)
+    literal_command_inference(domain, plan_end_state," "* utterances[1], verbose=true)
 top_command = commands[1]
 
 
@@ -110,41 +113,48 @@ top_command = commands[1]
 
 # Print top 5 commands and their probabilities
 println("Top 5 most probable commands:")
-for idx in 1:5
+for idx in 1:25
     command_str = repr("text/plain", commands[idx])
     @printf("%.3f: %s\n", command_probs[idx], command_str)
 end
 
+for idx in 1:149
+    if repr("text/plain", commands[idx]) == "(grab you plate1 l) (grab you plate2 l)"
+        print(idx)
+    end
+    # @printf("%.3f: %s\n", command_probs[idx], command_str)
+end
+
 # Compute naive assistance options and plans for top command
 top_naive_assist_results = literal_assistance_naive(
-    top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
+    top_command, domain, plan_end_state, true_goal_spec, :item;
     verbose = true
 )
 
 # Compute expected assistance options and plans via systematic sampling
 expected_naive_assist_results = literal_assistance_naive(
     commands, command_probs,
-    domain, plan_end_state, true_goal_spec, assist_obj_type;
+    domain, plan_end_state, true_goal_spec, :item;
     verbose = true, n_samples = 5
 )
 
 # Compute efficient assistance options and plans for top command
 top_efficient_assist_results = literal_assistance_efficient(
-    top_command, domain, plan_end_state, true_goal_spec, assist_obj_type;
+    top_command, domain, plan_end_state, true_goal_spec, :item;
     verbose = true
 )
 
 # Compute expected assistance options and plans via systematic sampling
 expected_efficient_assist_results = literal_assistance_efficient(
     commands, command_probs,
-    domain, plan_end_state, true_goal_spec, assist_obj_type;
+    domain, plan_end_state, true_goal_spec, :item;
     verbose = true, n_samples = 50
 )
 
 ## Configure agent and world model ##
 
 # Set options that vary across runs
-ACT_TEMPERATURE = 1.0
+ACT_TEMPERATURE = 0.5
 MODALITIES = (:action, :utterance)
 MODALITIES = (:action)
 goal_names= [["veggie_salad","chicken_salad","chicken_stew","salmon_stew","potato_stew"],
@@ -205,17 +215,19 @@ init_strata = choiceproduct((goal_addr, 1:length(goals[p])),
 
 # Configure planner
 heuristic = memoized(precomputed(FFHeuristic(), domain, state))
-planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=1000)
+# planner = RTDP(heuristic=heuristic, n_rollouts=0)
+planner = RTHS(heuristic=heuristic, n_iters=0, max_nodes=1000)
 
+ACT_TEMPERATURE =0.1
 # Define communication and action configuration
 act_config = BoltzmannActConfig(ACT_TEMPERATURE)
-if :utterance in MODALITIES
-    act_config = CommunicativeActConfig(
-        act_config, # Assume some Boltzmann action noise
-        pragmatic_utterance_model, # Utterance model
-        (domain, planner) # Domain and planner are arguments to utterance model
-    )
-end
+# if :utterance in MODALITIES
+#     act_config = CommunicativeActConfig(
+#         act_config, # Assume some Boltzmann action noise
+#         pragmatic_utterance_model, # Utterance model
+#         (domain, planner) # Domain and planner are arguments to utterance model
+#     )
+# end
 
 # Define agent configuration
 agent_config = AgentConfig(
@@ -279,7 +291,6 @@ callback = DKGCombinedCallback(
     renderer, domain;
     goal_addr = goal_addr,
     goal_names = goal_names[p],
-    goal_colors = gem_colors,
     obs_trajectory = PDDL.simulate(domain, state, plan),
     print_goal_probs = true,
     plot_goal_bars = false,
@@ -317,12 +328,12 @@ goal_probs = callback.logger.data[:goal_probs]
 goal_probs = reduce(hcat, goal_probs)
 
 # Extract cost probabilities
-cost_probs = callback.logger.data[:cost_probs]
-cost_probs = reduce(hcat, cost_probs)
+# cost_probs = callback.logger.data[:cost_probs]
+# cost_probs = reduce(hcat, cost_probs)
 
 ## Compute pragmatic assistance options and plans ##
 
 pragmatic_assist_results = pragmatic_assistance_offline(
-    pf_state, domain, plan_end_state, true_goal_spec, assist_obj_type;
+    pf_state, domain, plan_end_state, true_goal_spec, :item;
     act_temperature = ACT_TEMPERATURE, verbose = true
 )

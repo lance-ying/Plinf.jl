@@ -9,34 +9,34 @@ include("utils.jl")
 # Example translations from salient actions to instructions/requests
 utterance_examples = [
     # Single assistant actions (no predicates)
-    ("(grab you plate1)",
+    ("(grab you plate1 l)",
      "Can you get a plate?"),
-    ("(grab you cheese1)",
+    ("(grab you cheese1 l)",
      "Can you go get the cheese?"),
-    ("(grab you cutleryfork1)",
+    ("(grab you cutleryfork1 l)",
      "We need a fork."),
     # Multiple assistant actions (distinct)
-    ("(grab you cutleryfork1) (grab you cutleryknife1)",
+    ("(grab you cutleryfork1 l) (grab you cutleryknife1 l)",
      "Can you get me a fork and knife?"),
-    ("(grab you carrot1) (grab you onion1)",
+    ("(grab you carrot1 l) (grab you onion1 l)",
      "Hand me the veggies."),
-    ("(grab you juice1) (grab you waterglass1)",
+    ("(grab you juice1 l) (grab you waterglass1 l)",
      "Give me juice and a glass."),
     # Multiple assistant actions (combined)
-    ("(grab you cutleryfork1) (grab you cutleryfork2)",
+    ("(grab you cutleryfork1 l) (grab you cutleryfork2 l)",
      "Go get two forks"),
-    ("(grab you plate1) (grab you plate2)",
+    ("(grab you plate1 l) (grab you plate2 l)",
      "Go find two plates"),
-    ("(grab you plate1) (grab you plate2) (grab you plate3) (grab you bowl1) (grab you bowl2) (grab you bowl3)",
+    ("(grab you plate1 l) (grab you plate2 l) (grab you plate3 l) (grab you bowl1 l) (grab you bowl2 l) (grab you bowl3 l)",
      "Can you go find three plates and bowls?"),
-    ("(grab you waterglass1) (grab you waterglass2) (grab you waterglass3)",
+    ("(grab you waterglass1 l) (grab you waterglass2 l) (grab you waterglass3 l)",
      "Could you get the waterglasses?"),
     # Joint actions
-    ("(grab me plate1)(grab me plate2) (grab you bowl1)(grab you bowl2)",
+    ("(grab me plate1 l)(grab me plate2 l) (grab you bowl1 l)(grab you bowl2 l)",
      "I will find two plates. Can you get the bowls?"),
-    ("(grab me cutleryfork1) (grab me cutleryfork2) (grab me cutleryknife1) (grab me cutleryknife2)",
+    ("(grab me cutleryfork1 l) (grab me cutleryfork2 l) (grab me cutleryknife1 l) (grab me cutleryknife2 l)",
      "We need some cutlery for 2 people. I'm picking up forks, can you get knives?"),
-    ("(grab me chefknife1) (grab you carrot)",
+    ("(grab me chefknife1 l) (grab you carrot1 l)",
      "Can you get the carrot from the fridge while I get the knife?")
 ]
 
@@ -79,7 +79,7 @@ function lift_command(
     command::ActionCommand, state::State;
     ignore = [pddl"(me)", pddl"(you)"],
 )
-    args_to_vars = Dict{Const, Var}()
+    args_to_vars = Dict{Const, Const}()
     type_count = Dict{Symbol, Int}()
     actions = map(command.actions) do act
         args = map(act.args) do arg
@@ -89,8 +89,11 @@ function lift_command(
                 type = Symbol(String(arg.name)[1:end-1])
                 count = get(type_count, type, 0) + 1
                 type_count[type] = count
-                name = Symbol(uppercasefirst(string(type)), count)
-                return Var(name)
+                if length(String(arg.name))==1
+                    return Var(Symbol(uppercasefirst(string(type))))
+                end
+                name = Symbol(string(type), count)
+                return Const(name)
             end
             return var
         end
@@ -116,10 +119,13 @@ function ground_command(
     types = Symbol[]
     for act in command.actions
         for arg in act.args
-            arg isa Var || continue
-            push!(vars, arg)
-            type = Symbol(lowercase(string(arg.name)[1:end-1]))
-            push!(types, type)
+            if arg.name == :L
+                push!(types, :location)
+            end
+            # arg isa Var || continue
+            # push!(vars, arg)
+            # type = Symbol(lowercase(string(arg.name)[1:end-1]))
+            # push!(types, type)
         end
     end
     # Find all possible groundings
@@ -143,15 +149,15 @@ function command_to_goals(
     speaker = pddl"(human)",
     listener = pddl"(robot)",
     act_goal_map = Dict(
-        :pickup => act -> Compound(:has, Term[act.args[1], act.args[2]]),
-        :handover => act -> Compound(:and,
-            [Compound(:has, Term[act.args[2], act.args[3]]),
-             Compound(Symbol("pickedup-by"), Term[act.args[1], act.args[3]])]
-        ),
-        :unlock => act -> Compound(:and, 
-            [Compound(Symbol("unlocked-by"), Term[act.args[1], act.args[3]]),
-             Compound(Symbol("unlocked-with"), Term[act.args[2], act.args[3]])]
-        )
+        :grab => act -> Compound(:delivered, Term[act.args[2]]),
+        # :handover => act -> Compound(:and,
+        #     [Compound(:has, Term[act.args[2], act.args[3]]),
+        #      Compound(Symbol("pickedup-by"), Term[act.args[1], act.args[3]])]
+        # ),
+        # :unlock => act -> Compound(:and, 
+        #     [Compound(Symbol("unlocked-by"), Term[act.args[1], act.args[3]]),
+        #      Compound(Symbol("unlocked-with"), Term[act.args[2], act.args[3]])]
+        # )
     )
 )
     # Extract variables and infer their types
@@ -159,10 +165,13 @@ function command_to_goals(
     types = Symbol[]
     for act in command.actions
         for arg in act.args
-            arg isa Var || continue
-            push!(vars, arg)
-            type = Symbol(lowercase(string(arg.name)[1:end-1]))
-            push!(types, type)
+            if arg.name == :L
+                push!(types, :location)
+            end
+            # arg isa Var || continue
+            # push!(vars, arg)
+            # type = Symbol(lowercase(string(arg.name)[1:end-1]))
+            # push!(types, type)
         end
     end
     # Convert each action to goal
@@ -259,7 +268,7 @@ pronouns_to_names(term::Const; kwargs...) = term
 "Extract focal objects from an action command or plan."
 function extract_focal_objects(
     command::ActionCommand;
-    obj_arg_idxs = Dict(:pickup => 2, :handover => 3, :unlock => 3)
+    obj_arg_idxs = Dict(:grab => 2)
 )
     objects = Term[]
     for act in command.actions
@@ -290,20 +299,25 @@ function extract_focal_objects_from_plan(
     command::ActionCommand, plan::AbstractVector{<:Term}
 )
     focal_vars = extract_focal_objects(command)
-    focal_objs = Term[]
-    command = pronouns_to_names(command)
-    for cmd_act in command.actions
-        for act in plan
-            unifiers = PDDL.unify(cmd_act, act)
-            isnothing(unifiers) && continue
-            for var in focal_vars
-                if haskey(unifiers, var)
-                    push!(focal_objs, unifiers[var])
-                end
-            end
-        end
-    end
-    return unique!(focal_objs)
+    # focal_objs = Term[]
+    # command = pronouns_to_names(command)
+    # print(focal_vars)
+    # print(command)
+    # for cmd_act in command.actions
+    #     for act in plan
+    #         unifiers = PDDL.unify(cmd_act, act)
+            
+    #         isnothing(unifiers) && continue
+    #         for var in focal_vars
+    #             print(unifiers)
+    #             if haskey(unifiers, var)
+    #                 push!(focal_objs, unifiers[var])
+    #             end
+    #         end
+    #     end
+    # end
+    # print(focal_objs)
+    return focal_vars
 end
 
 "Extract salient actions (with predicate modifiers) from a plan."
@@ -487,7 +501,7 @@ function construct_utterance_prompt(command::ActionCommand, examples)
 end
 
 # Define GPT-3 mixture generative function
-gpt3_mixture = GPT3Mixture(model="text-curie-001", stop="\n", max_tokens=64)
+gpt3_mixture = GPT3Mixture(model="text-davinci-002", stop="\n", max_tokens=64, temperature = 0.5)
 
 "Extract unnormalized logprobs of utterance conditioned on each command."
 function extract_utterance_scores_per_command(trace::Trace, addr=:utterance)
@@ -519,6 +533,7 @@ end
     end
     # Sample utterance from GPT-3 mixture over prompts
     # print(prompts)
+    println()
     utterance ~ gpt3_mixture(prompts)
     return utterance
 end
@@ -541,26 +556,65 @@ end
     spec = convert(Specification, agent_state.goal_state)
     # Rollout planning solution to get future plan
     plan = rollout_sol(domain, planner, state, sol, spec)
-    # Extract salient actions and predicates from plan
+     # Extract salient actions and predicates from plan
     actions, agents, predicates = extract_salient_actions(domain, state, plan)
-    # Enumerate action commands
-    commands = enumerate_commands(actions, agents, predicates)
-    # Construct prompts for each unique action command
-    if isempty(commands)
-        prompts = ["\n"]
-        probs = [1.0]
-    else
-        command_probs = proportionmap(commands) # Compute probabilities
-        prompts = String[]
-        probs = Float64[]
-        for (command, prob) in command_probs
-            prompt = construct_utterance_prompt(command, examples)
-            push!(prompts, prompt)
-            push!(probs, prob)
-        end
+     # Enumerate action commands
+    commands = ActionCommand[]
+    actions = map(actions) do act
+        names_to_pronouns(act; speaker=pddl"(human)",listener=pddl"(robot)")
     end
+    # print("Actions",actions)
+    for idxs in 1:length(actions)
+        cmd = ActionCommand(actions[idxs:idxs], Term[])
+        push!(commands, cmd)
+    end
+
+    #  commands = enumerate_commands(actions, agents, predicates)
+     commands = lift_command.(commands, [state])
+
+     print(commands)
+     println()
+     # Construct prompts for each unique action command
+     if isempty(commands)
+         prompts = ["\n"]
+         probs = [1.0]
+     else
+         command_probs = proportionmap(commands) # Compute probabilities
+         prompts = String[]
+         probs = Float64[]
+         for (command, prob) in command_probs
+             prompt = construct_utterance_prompt(command, examples)
+             push!(prompts, prompt)
+             push!(probs, prob)
+         end
+     end
     # Sample utterance from GPT-3 mixture over prompts
-    print(prompts)
+    # print(prompts)
     utterance ~ gpt3_mixture(prompts, probs)
     return utterance
+end
+
+"Statically check if a ground action command is possible in a domain and state."
+function is_command_possible(
+    command::ActionCommand, domain::Domain, state::State;
+    speaker = pddl"(human)", listener = pddl"(robot)",
+    statics = PDDL.infer_static_fluents(domain)
+)
+    possible = true
+    command = pronouns_to_names(command; speaker, listener)
+    for act in command.actions
+        # Substitute and simplify precondition
+        act_schema = PDDL.get_action(domain, act.name)
+        act_vars = PDDL.get_argvars(act_schema)
+        subst = PDDL.Subst(var => val for (var, val) in zip(act_vars, act.args))
+        precond = PDDL.substitute(PDDL.get_precond(act_schema), subst)
+        # Append predicates
+        preconds = append!(PDDL.flatten_conjs(precond), command.predicates)
+        precond = Compound(:and, preconds)
+        # Simplify static terms
+        precond = PDDL.dequantify(precond, domain, state)
+        precond = PDDL.simplify_statics(precond, domain, state, statics)
+        possible = precond.name != false
+    end
+    return possible
 end
