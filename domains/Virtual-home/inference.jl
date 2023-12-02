@@ -96,7 +96,7 @@ function literal_assistance_naive(
     # print(assist_objs)
     assist_option_probs = zeros(length(assist_objs))
     g_commands = ground_command(command, domain, state)
-    print(g_commands)
+    # print(g_commands)
     for cmd in g_commands
         focal_objs = extract_focal_objects(cmd)
         for obj in focal_objs

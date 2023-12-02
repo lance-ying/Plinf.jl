@@ -533,7 +533,7 @@ end
     end
     # Sample utterance from GPT-3 mixture over prompts
     # print(prompts)
-    println()
+    # println()
     utterance ~ gpt3_mixture(prompts)
     return utterance
 end
@@ -572,8 +572,8 @@ end
     #  commands = enumerate_commands(actions, agents, predicates)
      commands = lift_command.(commands, [state])
 
-     print(commands)
-     println()
+    #  print(commands)
+    #  println()
      # Construct prompts for each unique action command
      if isempty(commands)
          prompts = ["\n"]

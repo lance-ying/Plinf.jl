@@ -11,6 +11,7 @@ include("utils.jl")
 include("plan_io.jl")
 include("utterance_model.jl")
 include("inference.jl")
+include("scenario copy.jl")
 
 PDDL.Arrays.@register()
 
@@ -116,6 +117,10 @@ df = DataFrame(
     goal_probs_6 = Float64[],
     goal_probs_7 = Float64[],
     goal_probs_8 = Float64[],
+    goal_probs_9 = Float64[],
+    goal_probs_10 = Float64[],
+    goal_probs_11 = Float64[],
+    goal_probs_12 = Float64[],
     true_goal_probs = Float64[],
     brier_score = Float64[],
     lml_est = Float64[],

@@ -1,4 +1,4 @@
-goal_name = ["veggie_salad","chicken_salad","chicken_stew","salmon_stew","potato_stew","set_table1", "set_table2","set_table3","set_table4","set_table1b","set_table2b","set_table3b","set_table4b","wine1","wine2","wine3","wine4","wine1p","wine2p","wine3p","wine4p","juice1","juice2","juice3","juice4","juice1p","juice2p","juice3p","juice4p"]
+goal_name = ["veggie_salad","chicken_salad","chicken_stew","salmon_stew","potato_stew","set_table1", "set_table2","set_table3","set_table4","set_table1b","set_table2b","set_table3b","set_table4b","plate1","plate2","plate3","plate4","wine1","wine2","wine3","wine4","wine1p","wine2p","wine3p","wine4p","juice1","juice2","juice3","juice4","juice1p","juice2p","juice3p","juice4p"]
 
 goals_copy = @pddl("(and (delivered onion1) (delivered cucumber1) (delivered tomato1) (delivered chefknife1))",
 "(and (delivered onion1) (delivered cucumber1) (delivered chicken1) (delivered chefknife1))",
@@ -14,6 +14,10 @@ goals_copy = @pddl("(and (delivered onion1) (delivered cucumber1) (delivered tom
 "(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(not(delivered cutleryfork4)) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3)(not(delivered cutleryknife4)) (delivered plate1)(delivered plate2)(delivered plate3)(not(delivered plate4))(delivered bowl1)(delivered bowl2)(delivered bowl3)(not(delivered bowl4)))",
 "(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cutleryfork4) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3)(delivered cutleryknife4) (delivered plate1)(delivered plate2)(delivered plate3)(delivered plate4)(delivered bowl1)(delivered bowl2)(delivered bowl3)(delivered bowl4))",
 "(and (delivered wineglass1)(delivered wine1))",
+"(and (not (delivered cutleryfork1))(not(delivered cutleryfork2))(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (not (delivered cutleryknife1))(not(delivered cutleryknife2))(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(not(delivered plate2))(not(delivered plate3))(not(delivered plate4))(not(delivered bowl1))(not(delivered bowl2))(not(delivered bowl3))(not(delivered bowl4)))",
+"(and (not (delivered cutleryfork1))(not(delivered cutleryfork2))(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (not (delivered cutleryknife1))(not(delivered cutleryknife2))(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(delivered plate2)(not(delivered plate3))(not(delivered plate4))(not(delivered bowl1))(not(delivered bowl2))(not(delivered bowl3))(not(delivered bowl4)))",
+"(and (not (delivered cutleryfork1))(not(delivered cutleryfork2))(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (not (delivered cutleryknife1))(not(delivered cutleryknife2))(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(delivered plate2)(delivered plate3)(not(delivered plate4))(not(delivered bowl1))(not(delivered bowl2))(not(delivered bowl3))(not(delivered bowl4)))",
+"(and (not (delivered cutleryfork1))(not(delivered cutleryfork2))(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (not (delivered cutleryknife1))(not(delivered cutleryknife2))(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(delivered plate2)(delivered plate3)(delivered plate4)(not(delivered bowl1))(not(delivered bowl2))(not(delivered bowl3))(not(delivered bowl4)))",
 "(and (delivered wineglass1)(delivered wineglass2) (delivered wine1))",
 "(and (delivered wineglass1)(delivered wineglass2)(delivered wineglass3) (delivered wine1))",
 "(and (delivered wineglass1)(delivered wineglass2)(delivered wineglass3)(delivered wineglass4) (delivered wine1))",
@@ -46,8 +50,11 @@ goals = [@pddl("(and (delivered onion1) (delivered cucumber1) (delivered tomato1
 "(and (delivered cutleryfork1)(not(delivered cutleryfork2))(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (delivered cutleryknife1)(not(delivered cutleryknife2))(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(not(delivered plate2))(not(delivered plate3))(not(delivered plate4))(delivered bowl1)(not(delivered bowl2))(not(delivered bowl3))(not(delivered bowl4)))",
 "(and (delivered cutleryfork1)(delivered cutleryfork2)(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (delivered cutleryknife1)(delivered cutleryknife2)(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(delivered plate2)(not(delivered plate3))(not(delivered plate4))(delivered bowl1)(delivered bowl2)(not(delivered bowl3))(not(delivered bowl4)))",
 "(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(not(delivered cutleryfork4)) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3)(not(delivered cutleryknife4)) (delivered plate1)(delivered plate2)(delivered plate3)(not(delivered plate4))(delivered bowl1)(delivered bowl2)(delivered bowl3)(not(delivered bowl4)))",
-"(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cutleryfork4) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3)(delivered cutleryknife4) (delivered plate1)(delivered plate2)(delivered plate3)(delivered plate4)(delivered bowl1)(delivered bowl2)(delivered bowl3)(delivered bowl4))"),
-
+"(and (delivered cutleryfork1)(delivered cutleryfork2)(delivered cutleryfork3)(delivered cutleryfork4) (delivered cutleryknife1)(delivered cutleryknife2)(delivered cutleryknife3)(delivered cutleryknife4) (delivered plate1)(delivered plate2)(delivered plate3)(delivered plate4)(delivered bowl1)(delivered bowl2)(delivered bowl3)(delivered bowl4))",
+"(and (not (delivered cutleryfork1))(not(delivered cutleryfork2))(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (not (delivered cutleryknife1))(not(delivered cutleryknife2))(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(not(delivered plate2))(not(delivered plate3))(not(delivered plate4))(not(delivered bowl1))(not(delivered bowl2))(not(delivered bowl3))(not(delivered bowl4)))",
+"(and (not (delivered cutleryfork1))(not(delivered cutleryfork2))(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (not (delivered cutleryknife1))(not(delivered cutleryknife2))(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(delivered plate2)(not(delivered plate3))(not(delivered plate4))(not(delivered bowl1))(not(delivered bowl2))(not(delivered bowl3))(not(delivered bowl4)))",
+"(and (not (delivered cutleryfork1))(not(delivered cutleryfork2))(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (not (delivered cutleryknife1))(not(delivered cutleryknife2))(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(delivered plate2)(delivered plate3)(not(delivered plate4))(not(delivered bowl1))(not(delivered bowl2))(not(delivered bowl3))(not(delivered bowl4)))",
+"(and (not (delivered cutleryfork1))(not(delivered cutleryfork2))(not(delivered cutleryfork3))(not(delivered cutleryfork4)) (not (delivered cutleryknife1))(not(delivered cutleryknife2))(not(delivered cutleryknife3))(not(delivered cutleryknife4)) (delivered plate1)(delivered plate2)(delivered plate3)(delivered plate4)(not(delivered bowl1))(not(delivered bowl2))(not(delivered bowl3))(not(delivered bowl4)))"),
 
 @pddl("(and (delivered wineglass1)(delivered wine1))",
 "(and (delivered wineglass1)(delivered wineglass2) (delivered wine1))",
@@ -70,7 +77,7 @@ goals = [@pddl("(and (delivered onion1) (delivered cucumber1) (delivered tomato1
 
 goal_dict = Dict()
 
-for i in 1:29
+for i in 1:33
     goal_dict[goal_name[i]]=goals_copy[i]
 end
 

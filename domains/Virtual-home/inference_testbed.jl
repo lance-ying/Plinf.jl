@@ -12,7 +12,7 @@ include("utterance_model.jl")
 include("inference.jl")
 include("render.jl")
 include("callbacks.jl")
-include("scenario.jl")
+include("scenario copy.jl")
 
 PDDL.Arrays.@register()
 GLMakie.activate!(inline=false)
@@ -43,7 +43,7 @@ PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 ## Set-up for specific plan and problem ##
 
 # Select plan and problem
-plan_id = "2.5"
+plan_id = "2.3"
 p = parse(Integer, plan_id[1])
 
 plan = PLANS[plan_id]
@@ -158,7 +158,7 @@ ACT_TEMPERATURE = 0.5
 MODALITIES = (:action, :utterance)
 MODALITIES = (:action)
 goal_names= [["veggie_salad","chicken_salad","chicken_stew","salmon_stew","potato_stew"],
-["set_table1", "set_table2","set_table3","set_table4","set_table1b","set_table2b","set_table3b","set_table4b"],
+["set_table1", "set_table2","set_table3","set_table4","set_table1b","set_table2b","set_table3b","set_table4b", "plate1", "plate2", "plate3", "plate4"],
 ["wine1","wine2","wine3","wine4","wine1p","wine2p","wine3p","wine4p","juice1","juice2","juice3","juice4","juice1p","juice2p","juice3p","juice4p"]]
 
 # goals
@@ -221,13 +221,13 @@ planner = RTHS(heuristic=heuristic, n_iters=0, max_nodes=1000)
 ACT_TEMPERATURE =0.1
 # Define communication and action configuration
 act_config = BoltzmannActConfig(ACT_TEMPERATURE)
-# if :utterance in MODALITIES
-#     act_config = CommunicativeActConfig(
-#         act_config, # Assume some Boltzmann action noise
-#         pragmatic_utterance_model, # Utterance model
-#         (domain, planner) # Domain and planner are arguments to utterance model
-#     )
-# end
+if MODALITIES != :action
+    act_config = CommunicativeActConfig(
+        act_config, # Assume some Boltzmann action noise
+        pragmatic_utterance_model, # Utterance model
+        (domain, planner) # Domain and planner are arguments to utterance model
+    )
+end
 
 # Define agent configuration
 agent_config = AgentConfig(
@@ -262,7 +262,7 @@ observations = act_choicemap_vec(obs_plan)
 timesteps = collect(1:length(observations))
 
 # Add utterances to choicemaps
-if :utterance in MODALITIES
+if MODALITIES!= :action
     # Set `speak` to false for all timesteps
     for (t, obs) in zip(timesteps, observations)
         obs[:timestep => t => :act => :speak] = false
@@ -292,6 +292,7 @@ callback = DKGCombinedCallback(
     goal_addr = goal_addr,
     goal_names = goal_names[p],
     obs_trajectory = PDDL.simulate(domain, state, plan),
+    goal_colors = false,
     print_goal_probs = true,
     plot_goal_bars = false,
     plot_goal_lines = false,

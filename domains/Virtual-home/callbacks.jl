@@ -30,7 +30,7 @@ function DKGCombinedCallback(
     renderer::GridworldRenderer, domain::Domain;
     goal_addr = :init => :agent => :goal => :goal,
     goal_names = ["(has gem1)", "(has gem2)", "(has gem3)"],
-    goal_colors = PDDLViz.colorschemes[:vibrant][1:length(goal_names)],
+    goal_colors = PDDLViz.colorschemes[:vibrant],
     obs_trajectory = nothing,
     print_goal_probs::Bool = true,
     render::Bool = true,
