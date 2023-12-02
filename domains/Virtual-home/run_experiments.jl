@@ -47,14 +47,14 @@ GOALS = goals[2]
 
 # Possible cost profiles
 COST_PROFILES = [ # Equal cost profile
-(robot = (
-    move=5, grab=1.2, noop=0.6
-),
+# (robot = (
+#     move=5, grab=1.2, noop=0.6
+# ),
 
-human = (
-    move=5, grab=1, noop=0.6
-)
-),
+# human = (
+#     move=5, grab=1, noop=0.6
+# )
+# ),
 (robot = (
     move=5, grab=1, noop=0.6
 ),
@@ -91,7 +91,7 @@ N_LITERAL_NAIVE_SAMPLES = 10
 N_LITERAL_EFFICIENT_SAMPLES = 10
 
 # Whether to run literal or pragmatic inference
-RUN_LITERAL = true
+RUN_LITERAL = false
 RUN_PRAGMATIC = true
 
 ## Run experiments ##
@@ -172,9 +172,16 @@ for plan_id in PLAN_IDS[1:end]
 
     # Construct true goal specification
     action_costs = (
-    move=5, grab=1.2, noop=0.6
+        (robot = (
+            move=5, grab=1, noop=0.6
+        ),
+        
+        human = (
+            move=5, grab=10, noop=0.6
+        ))
 )
-    true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
+    true_goal_spec = MinPerAgentActionCosts(Term[true_goal], action_costs)
+    # true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
 
     # print(true_goal_spec)
 
@@ -372,9 +379,8 @@ for plan_id in PLAN_IDS[1:end]
                 end
                 pragmatic_assist_results = pragmatic_assistance_offline(
                     pf, domain, plan_end_state,
-                    true_goal_spec, assist_obj_type;
-                    verbose = true, max_steps = MAX_STEPS, 
-                    act_temperature
+                    true_goal_spec, completion, assist_obj_type;
+                    verbose = true, max_steps=100
                 )
                 entry[:assist_plan] =
                     join(write_pddl.(pragmatic_assist_results.full_plan), "\n")

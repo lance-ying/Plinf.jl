@@ -43,7 +43,7 @@ PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 ## Set-up for specific plan and problem ##
 
 # Select plan and problem
-plan_id = "2.3"
+plan_id = "2.6"
 p = parse(Integer, plan_id[1])
 
 plan = PLANS[plan_id]
@@ -59,10 +59,18 @@ true_goal = goal_dict[pid_dict[plan_id]]
 
 # Construct true goal specification
 action_costs = (
-    move=5, grab=1.2, noop=0.6
+
+    robot = (
+        move=10, grab=1, noop=0.6
+    ),
+    
+    human = (
+        move=10, grab=10, noop=0.6
+    )
 )
 
-true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
+# true_goal_spec = MinActionCosts(Term[true_goal], action_costs)
+true_goal_spec = MinPerAgentActionCosts(Term[true_goal], action_costs)
 
 state = initstate(DOMAIN, problem)
 
@@ -156,7 +164,7 @@ expected_efficient_assist_results = literal_assistance_efficient(
 # Set options that vary across runs
 ACT_TEMPERATURE = 0.5
 MODALITIES = (:action, :utterance)
-MODALITIES = (:action)
+# MODALITIES = (:action)
 goal_names= [["veggie_salad","chicken_salad","chicken_stew","salmon_stew","potato_stew"],
 ["set_table1", "set_table2","set_table3","set_table4","set_table1b","set_table2b","set_table3b","set_table4b", "plate1", "plate2", "plate3", "plate4"],
 ["wine1","wine2","wine3","wine4","wine1p","wine2p","wine3p","wine4p","juice1","juice2","juice3","juice4","juice1p","juice2p","juice3p","juice4p"]]
@@ -170,14 +178,6 @@ goal_names= [["veggie_salad","chicken_salad","chicken_stew","salmon_stew","potat
 
 # Define possible cost profiles
 cost_profiles = [ # Equal cost profile
-    (robot = (
-        move=5, grab=1.2, noop=0.6
-    ),
-
-    human = (
-        move=5, grab=1, noop=0.6
-    )
-    ),
     (robot = (
         move=5, grab=1, noop=0.6
     ),
@@ -217,6 +217,7 @@ init_strata = choiceproduct((goal_addr, 1:length(goals[p])),
 heuristic = memoized(precomputed(FFHeuristic(), domain, state))
 # planner = RTDP(heuristic=heuristic, n_rollouts=0)
 planner = RTHS(heuristic=heuristic, n_iters=0, max_nodes=1000)
+
 
 ACT_TEMPERATURE =0.1
 # Define communication and action configuration
@@ -334,7 +335,10 @@ goal_probs = reduce(hcat, goal_probs)
 
 ## Compute pragmatic assistance options and plans ##
 
+assist_obj_type=:item
+
 pragmatic_assist_results = pragmatic_assistance_offline(
-    pf_state, domain, plan_end_state, true_goal_spec, :item;
-    act_temperature = ACT_TEMPERATURE, verbose = true
+    pf_state, domain, plan_end_state,
+    true_goal_spec, completion, assist_obj_type;
+    verbose = true, max_steps=100
 )

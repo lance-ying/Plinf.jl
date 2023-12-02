@@ -11,4 +11,4 @@
 (grab human cutleryknife2 cabinet4)
 (noop robot)
 (grab human cutleryknife3 cabinet4)
-; Can you bring the plates and bowls?
+; Can you bring the plates?

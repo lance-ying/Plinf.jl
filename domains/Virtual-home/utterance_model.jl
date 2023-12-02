@@ -9,12 +9,12 @@ include("utils.jl")
 # Example translations from salient actions to instructions/requests
 utterance_examples = [
     # Single assistant actions (no predicates)
-    ("(grab you plate1 l)",
-     "Can you get a plate?"),
-    ("(grab you cheese1 l)",
-     "Can you go get the cheese?"),
-    ("(grab you cutleryfork1 l)",
-     "We need a fork."),
+    # ("(grab you plate1 l)",
+    #  "Can you get a plate?"),
+    # ("(grab you cheese1 l)",
+    #  "Can you go get the cheese?"),
+    # ("(grab you cutleryfork1 l)",
+    #  "We need a fork."),
     # Multiple assistant actions (distinct)
     ("(grab you cutleryfork1 l) (grab you cutleryknife1 l)",
      "Can you get me a fork and knife?"),
@@ -32,12 +32,12 @@ utterance_examples = [
     ("(grab you waterglass1 l) (grab you waterglass2 l) (grab you waterglass3 l)",
      "Could you get the waterglasses?"),
     # Joint actions
-    ("(grab me plate1 l)(grab me plate2 l) (grab you bowl1 l)(grab you bowl2 l)",
-     "I will find two plates. Can you get the bowls?"),
-    ("(grab me cutleryfork1 l) (grab me cutleryfork2 l) (grab me cutleryknife1 l) (grab me cutleryknife2 l)",
-     "We need some cutlery for 2 people. I'm picking up forks, can you get knives?"),
-    ("(grab me chefknife1 l) (grab you carrot1 l)",
-     "Can you get the carrot from the fridge while I get the knife?")
+    # ("(grab me plate1 l)(grab me plate2 l) (grab you bowl1 l)(grab you bowl2 l)",
+    #  "I will find two plates. Can you get the bowls?"),
+    # ("(grab me cutleryfork1 l) (grab me cutleryfork2 l) (grab me cutleryknife1 l) (grab me cutleryknife2 l)",
+    #  "We need some cutlery for 2 people. I'm picking up forks, can you get knives?"),
+    # ("(grab me chefknife1 l) (grab you carrot1 l)",
+    #  "Can you get the carrot from the fridge while I get the knife?")
 ]
 
 Random.seed!(0)
@@ -501,7 +501,7 @@ function construct_utterance_prompt(command::ActionCommand, examples)
 end
 
 # Define GPT-3 mixture generative function
-gpt3_mixture = GPT3Mixture(model="text-davinci-002", stop="\n", max_tokens=64, temperature = 0.5)
+gpt3_mixture = GPT3Mixture(model="text-curie-001", stop="\n", max_tokens=64, temperature = 0.3)
 
 "Extract unnormalized logprobs of utterance conditioned on each command."
 function extract_utterance_scores_per_command(trace::Trace, addr=:utterance)
