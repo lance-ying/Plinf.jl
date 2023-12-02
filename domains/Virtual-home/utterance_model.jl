@@ -9,12 +9,12 @@ include("utils.jl")
 # Example translations from salient actions to instructions/requests
 utterance_examples = [
     # Single assistant actions (no predicates)
-    # ("(grab you plate1 l)",
-    #  "Can you get a plate?"),
-    # ("(grab you cheese1 l)",
-    #  "Can you go get the cheese?"),
-    # ("(grab you cutleryfork1 l)",
-    #  "We need a fork."),
+    ("(grab you plate1 l)",
+     "Can you get a plate?"),
+    ("(grab you cheese1 l)",
+     "Can you go get the cheese?"),
+    ("(grab you cutleryfork1 l)",
+     "We need a fork."),
     # Multiple assistant actions (distinct)
     ("(grab you cutleryfork1 l) (grab you cutleryknife1 l)",
      "Can you get me a fork and knife?"),
