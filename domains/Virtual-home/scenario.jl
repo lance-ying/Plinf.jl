@@ -111,27 +111,27 @@ pid_dict = Dict(
 
 )
 
-action_dict = Dict("3.1"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human wine1 fridge1)","(noop robot)","(move human fridge1 cabinet3)","(noop robot)", "(grab human wineglass1 cabinet3)"),
-"2.1"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)"),
-"2.2"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)","(noop robot)", "(grab human plate3 cabinet2)"),
-"2.3"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)","(noop robot)","(move human cabinet2 cabinet1)","(noop robot)", "(grab human bowl1 cabinet1)","(noop robot)","(grab human bowl2 cabinet1)","(noop robot)"),
-"1.1"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human potato1 fridge1)","(noop robot)", "(grab human wine1 fridge1)"),
-"3.2"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human juice1 fridge1)","(noop robot)"),
-"2.4"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)","(noop robot)","(move human cabinet2 cabinet4)","(noop robot)", "(grab human cutleryfork1 cabinet4)","(noop robot)","(grab human cutleryfork2 cabinet4)","(noop robot)"),
-"3.3"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)","(move human cabinet2 fridge1)","(noop robot)", "(grab human wine1 fridge1)","(noop robot)", "(grab human cheese1 fridge1)"),
-"3.4"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryfork3 cabinet4)","(noop robot)","(move human cabinet4 fridge1)","(noop robot)", "(grab human juice1 fridge1)"),
-"2.5"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryfork3 cabinet4)","(noop robot)","(grab human cutleryknife1 cabinet4)","(noop robot)", "(grab human cutleryknife2 cabinet4)","(noop robot)", "(grab human cutleryknife3 cabinet4)" ),
-"2.6"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryknife1 cabinet4)"),
-"1.2"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human tomato1 fridge1)","(noop robot)","(grab human cucumber1 fridge1)","(grab human onion1 fridge1)"),
-"1.3"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human chicken1 fridge1)","(noop robot)","(grab human cucumber1 fridge1)"),
-"3.5"=>@pddl("(move human table1 cabinet3)","(noop robot)","(grab human wineglass1 cabinet3)","(noop robot)","(grab human wineglass2 cabinet3)","(noop robot)","(grab human wineglass3 cabinet3)"),
-"3.6"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human juice1 fridge1)","(noop robot)","(grab human waterglass1 cabinet3)","(noop robot)"),
-"2.7"=>@pddl("(noop human)"),
-"3.7"=>@pddl("(noop human)"),
-"2.8"=>@pddl("(noop human)"),
-"3.8"=>@pddl("(noop human)"),
-"1.4"=>@pddl("(noop human)")
-)
+# action_dict = Dict("3.1"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human wine1 fridge1)","(noop robot)","(move human fridge1 cabinet3)","(noop robot)", "(grab human wineglass1 cabinet3)"),
+# "2.1"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)"),
+# "2.2"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)","(noop robot)", "(grab human plate3 cabinet2)"),
+# "2.3"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)","(noop robot)","(move human cabinet2 cabinet1)","(noop robot)", "(grab human bowl1 cabinet1)","(noop robot)","(grab human bowl2 cabinet1)","(noop robot)"),
+# "1.1"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human potato1 fridge1)","(noop robot)", "(grab human wine1 fridge1)"),
+# "3.2"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human juice1 fridge1)","(noop robot)"),
+# "2.4"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)", "(grab human plate2 cabinet2)","(noop robot)","(move human cabinet2 cabinet4)","(noop robot)", "(grab human cutleryfork1 cabinet4)","(noop robot)","(grab human cutleryfork2 cabinet4)","(noop robot)"),
+# "3.3"=>@pddl("(move human table1 cabinet2)","(noop robot)","(grab human plate1 cabinet2)","(noop robot)","(move human cabinet2 fridge1)","(noop robot)", "(grab human wine1 fridge1)","(noop robot)", "(grab human cheese1 fridge1)"),
+# "3.4"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryfork3 cabinet4)","(noop robot)","(move human cabinet4 fridge1)","(noop robot)", "(grab human juice1 fridge1)"),
+# "2.5"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryfork3 cabinet4)","(noop robot)","(grab human cutleryknife1 cabinet4)","(noop robot)", "(grab human cutleryknife2 cabinet4)","(noop robot)", "(grab human cutleryknife3 cabinet4)" ),
+# "2.6"=>@pddl("(move human table1 cabinet4)","(noop robot)","(grab human cutleryfork1 cabinet4)","(noop robot)", "(grab human cutleryfork2 cabinet4)","(noop robot)", "(grab human cutleryknife1 cabinet4)"),
+# "1.2"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human tomato1 fridge1)","(noop robot)","(grab human cucumber1 fridge1)","(grab human onion1 fridge1)"),
+# "1.3"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human chicken1 fridge1)","(noop robot)","(grab human cucumber1 fridge1)"),
+# "3.5"=>@pddl("(move human table1 cabinet3)","(noop robot)","(grab human wineglass1 cabinet3)","(noop robot)","(grab human wineglass2 cabinet3)","(noop robot)","(grab human wineglass3 cabinet3)"),
+# "3.6"=>@pddl("(move human table1 fridge1)","(noop robot)","(grab human juice1 fridge1)","(noop robot)","(grab human waterglass1 cabinet3)","(noop robot)"),
+# "2.7"=>@pddl("(noop human)"),
+# "3.7"=>@pddl("(noop human)"),
+# "2.8"=>@pddl("(noop human)"),
+# "3.8"=>@pddl("(noop human)"),
+# "1.4"=>@pddl("(noop human)")
+# )
 
 # utterance_dict=Dict(
 #     "3.1"=>"Can you get 2 more glasses?",
