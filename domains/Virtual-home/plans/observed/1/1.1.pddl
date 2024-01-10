@@ -1,6 +1,6 @@
 (move human table1 fridge1)
 (noop robot)
-(grab human potato1 fridge1)
+(grab human chicken1 fridge1)
 (noop robot)
-(grab human wine1 fridge1)
-; Can you get the vetegables for the stew?
+(noop human)
+; Can you get the wine and veggies for the stew?

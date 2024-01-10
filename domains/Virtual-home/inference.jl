@@ -492,7 +492,7 @@ function configure_pragmatic_speaker_model(
 
     # Configure planner
     heuristic = memoized(precomputed(FFHeuristic(), domain, state))
-    planner = RTHS(heuristic=heuristic, n_iters=0, max_nodes=1000)
+    planner = RTHS(heuristic=heuristic, n_iters=1, max_nodes=1000)
 
     # Define communication and action configuration
     act_config = BoltzmannActConfig(act_temperature)
@@ -741,16 +741,18 @@ function pragmatic_assistance_offline(
     max_steps::Int = 100,
     p_thresh::Float64 = 0.01,
     n_iters = 2,
-    max_nodes = 512,
+    max_nodes = 1000,
     verbose::Bool = false
 )
     # Extract probabilities, specifications and policies from particle filter
     start_t = Plinf.get_model_timestep(pf)
     model_config = Gen.get_args(pf.traces[1])[2]
     probs = get_norm_weights(pf)
+    # print(probs)
     goal_specs = map(pf.traces) do trace
         trace[:init => :agent => :goal]
     end
+    # print(goal_specs)
     policies = map(pf.traces) do trace
         if start_t == 0
             copy(trace[:init => :agent => :plan].sol)
@@ -761,6 +763,11 @@ function pragmatic_assistance_offline(
 
     # Initialize speaker's policy under true goal
     heuristic = precomputed(memoized(FFHeuristic()), domain, state)
+
+    # inner_heuristic = memoized(precomputed(FFHeuristic(), domain, state))
+    # astar = AStarPlanner(inner_heuristic, max_nodes=1000)
+    # heuristic = memoized(precomputed(PlannerHeuristic(astar), domain, state))
+
     planner = RTHS(heuristic=heuristic, n_iters=n_iters,
                    max_nodes=max_nodes, max_time=5)
     true_policy = planner(domain, state, true_goal_spec)
@@ -806,6 +813,12 @@ function pragmatic_assistance_offline(
                     act_cost = get_cost(spec, domain, state, act, next_state)
                     min_val = -((max_steps - t) * noop_cost + act_cost)
                     val = max(val, min_val)
+                    # print(act, " ")
+                    # print(val, " ")
+                    # print(prob)
+                    # print(spec.costs)
+
+                    # println()
                     act_values[act] += prob * val
                 end
             end
@@ -863,4 +876,25 @@ function pragmatic_assistance_offline(
         full_plan = assist_plan,
         goal_success = goal_success
     )
+end
+
+"Extract command distribution from pragmatic goal inference trace."
+function extract_inferred_commands(trace::Trace, t::Int)
+    if t == 0
+        step_trace = Gen.static_get_subtrace(trace, Val(:init))
+    else
+        step_trace = Gen.static_get_subtrace(trace, Val(:timestep)).subtraces[t]
+    end
+    act_trace = step_trace.trie[:act].subtrace_or_retval
+    utt_trace = act_trace.trie[:utterance].subtrace_or_retval
+    prompts = utt_trace.prompts
+    commands = map(prompts) do p
+        isempty(p) ? "" : split(p, "\n")[end-1]
+    end
+    scores = utt_trace.scores
+    perm = sortperm(scores, rev=true)
+    commands = commands[perm]
+    scores = scores[perm]
+    probs = softmax(scores)
+    return commands, scores, probs
 end

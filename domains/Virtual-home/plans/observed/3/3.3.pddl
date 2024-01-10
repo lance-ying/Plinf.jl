@@ -7,4 +7,4 @@
 (grab human wine1 fridge1)
 (noop robot)
 (grab human cheese1 fridge1)
-; Can you find 3 forks and some glasses?
+; Can you find two forks and glasses?

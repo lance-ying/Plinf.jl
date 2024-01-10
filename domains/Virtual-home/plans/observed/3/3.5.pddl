@@ -1,8 +1,11 @@
-(move human table1 cabinet3)
+(move human table1 cabinet2)
 (noop robot)
-(grab human wineglass1 cabinet3)
+(grab human plate1 cabinet2)
 (noop robot)
-(grab human wineglass2 cabinet3)
+; Can you find two forks?
+(move human cabinet2 fridge1)
 (noop robot)
-(grab human wineglass3 cabinet3)
-; Can you get the bottle from fridge?
+(grab human wine1 fridge1)
+(noop robot)
+(grab human cheese1 fridge1)
+; and some glasses?

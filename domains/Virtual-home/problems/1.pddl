@@ -1,7 +1,7 @@
 (define (problem virtual-home)
   (:domain virtual-home)
   (:objects fridge1 - fridge
-            onion1 tomato1 potato1 carrot1 wine1 chicken1 salmon1 cucumber1 cuttingboard1 chefknife1  - item
+            onion1 tomato1 potato1 carrot1 wine1 chicken1 salmon1 cucumber1 cuttingboard1 chefknife1 cutleryknife1 cutleryknife2 - item
             table1 - table
             robot - robot
             human - human
@@ -21,6 +21,8 @@
          (in salmon1 fridge1)
          (in cuttingboard1 cabinet5 )
          (in chefknife1 cabinet5 )
+         (in cutleryknife1 cabinet5 )
+         (in cutleryknife2 cabinet5 )
         )
   (:goal (has human wine1))
 )

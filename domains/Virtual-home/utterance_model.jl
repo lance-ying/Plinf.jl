@@ -11,8 +11,8 @@ utterance_examples = [
     # Single assistant actions (no predicates)
     ("(grab you plate1 l)",
      "Can you get a plate?"),
-    ("(grab you cheese1 l)",
-     "Can you go get the cheese?"),
+    ("(grab you bowl1 l)",
+     "Can you go get a bowl?"),
     ("(grab you cutleryfork1 l)",
      "We need a fork."),
     # Multiple assistant actions (distinct)
@@ -28,7 +28,7 @@ utterance_examples = [
     ("(grab you plate1 l) (grab you plate2 l)",
      "Go find two plates"),
     ("(grab you plate1 l) (grab you plate2 l) (grab you plate3 l) (grab you bowl1 l) (grab you bowl2 l) (grab you bowl3 l)",
-     "Can you go find three plates and bowls?"),
+     "Can you go find some plates and bowls?"),
     ("(grab you waterglass1 l) (grab you waterglass2 l) (grab you waterglass3 l)",
      "Could you get the waterglasses?"),
     # Joint actions
@@ -501,7 +501,7 @@ function construct_utterance_prompt(command::ActionCommand, examples)
 end
 
 # Define GPT-3 mixture generative function
-gpt3_mixture = GPT3Mixture(model="text-curie-001", stop="\n", max_tokens=64, temperature = 0.3)
+gpt3_mixture = GPT3Mixture(model="text-curie-001", stop="\n", max_tokens=64, temperature = 0.4)
 
 "Extract unnormalized logprobs of utterance conditioned on each command."
 function extract_utterance_scores_per_command(trace::Trace, addr=:utterance)

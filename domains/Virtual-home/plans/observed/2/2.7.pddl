@@ -2,9 +2,14 @@
 (noop robot)
 (grab human plate1 cabinet2)
 (noop robot)
+(grab human plate2 cabinet2)
+(noop robot)
 (move human cabinet2 cabinet4)
 (noop robot)
 (grab human cutleryfork1 cabinet4)
 (noop robot)
-(grab human cutleryknife1 cabinet4)
-; Get a bowl from the cabinet.
+(grab human cutleryfork2 cabinet4)
+; Can you fetch the knives?
+(noop robot)
+(noop human)
+; and bowls?

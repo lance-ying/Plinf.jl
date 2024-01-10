@@ -11,7 +11,7 @@ include("utils.jl")
 include("plan_io.jl")
 include("utterance_model.jl")
 include("inference.jl")
-include("scenario copy.jl")
+include("scenario.jl")
 
 PDDL.Arrays.@register()
 
@@ -20,11 +20,11 @@ PDDL.Arrays.@register()
 # Define directory paths
 PROBLEM_DIR = joinpath(@__DIR__, "problems")
 PLAN_DIR = joinpath(@__DIR__, "plans", "observed","2")
-COMPLETION_DIR = joinpath(@__DIR__, "plans", "completed","2")
+# COMPLETION_DIR = joinpath(@__DIR__, "plans", "completed","1")
 STIMULI_DIR = joinpath(@__DIR__, "stimuli")
 
 # Load domain
-DOMAIN = load_domain(joinpath(@__DIR__, "domain1.pddl"))
+DOMAIN = load_domain(joinpath(@__DIR__, "domain.pddl"))
 COMPILED_DOMAINS = Dict{String, Domain}()
 
 
@@ -38,7 +38,7 @@ end
 
 # Load utterance-annotated plans and completions
 PLAN_IDS, PLANS, UTTERANCES, UTTERANCE_TIMES = load_plan_dataset(PLAN_DIR)
-PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
+# PLAN_IDS, COMPLETIONS, _, _ = load_plan_dataset(COMPLETION_DIR)
 
 ## Define parameters ##
 
@@ -55,16 +55,16 @@ COST_PROFILES = [ # Equal cost profile
 #     move=5, grab=1, noop=0.6
 # )
 # ),
-(robot = (
-    move=5, grab=1, noop=0.6
-),
+# (robot = (
+#     move=5, grab=1, noop=0.6
+# ),
 
-human = (
-    move=5, grab=1, noop=0.6
-)
-),
+# human = (
+#     move=5, grab=1, noop=0.6
+# )
+# ),
 (robot = (
-    move=5, grab=1, noop=0.6
+    move=5, grab=1, noop=5.6
 ),
 
 human = (
@@ -73,7 +73,7 @@ human = (
 ]    
 
 # Boltzmann action temperatures
-ACT_TEMPERATURES = [0.2]
+ACT_TEMPERATURES = [0.5]
 
 # Possible modalities
 MODALITIES = [
@@ -91,8 +91,8 @@ N_LITERAL_NAIVE_SAMPLES = 10
 N_LITERAL_EFFICIENT_SAMPLES = 10
 
 # Whether to run literal or pragmatic inference
-RUN_LITERAL = false
-RUN_PRAGMATIC = true
+RUN_LITERAL = true
+RUN_PRAGMATIC = false
 
 ## Run experiments ##
 
@@ -148,7 +148,7 @@ df = DataFrame(
 datetime = Dates.format(Dates.now(), "yyyy-mm-ddTHH-MM-SS")
 df_path = "experiments_1.csv"
 df_path = joinpath(@__DIR__, df_path)
-
+# PLAN_IDS[1:end]
 # Iterate over plans
 for plan_id in PLAN_IDS[1:end]
     println("=== Plan $plan_id ===")
@@ -165,15 +165,15 @@ for plan_id in PLAN_IDS[1:end]
     problem = PROBLEMS[problem_id]
 
     # Determine true goal from completion
-    completion = COMPLETIONS[plan_id]
-    true_goal_obj = completion[end].args[2]
+    # completion = COMPLETIONS[plan_id]
+    # true_goal_obj = completion[end].args[2]
     true_goal = goal_dict[pid_dict[plan_id]]
     # print(true_goal)
 
     # Construct true goal specification
     action_costs = (
         (robot = (
-            move=5, grab=1, noop=0.6
+            move=5, grab=1, noop=5.6
         ),
         
         human = (
@@ -207,7 +207,7 @@ for plan_id in PLAN_IDS[1:end]
         :plan_id => plan_id,
         :problem_id => problem_id,
         :assist_type => "items",
-        :true_goal => string(true_goal_obj),
+        # :true_goal => string(true_goal_obj),
     )
 
     # Run literal inference and assistance
@@ -380,7 +380,7 @@ for plan_id in PLAN_IDS[1:end]
                 pragmatic_assist_results = pragmatic_assistance_offline(
                     pf, domain, plan_end_state,
                     true_goal_spec, completion, assist_obj_type;
-                    verbose = true, max_steps=100
+                    verbose = true, max_steps=40, p_thresh = 0.4
                 )
                 entry[:assist_plan] =
                     join(write_pddl.(pragmatic_assist_results.full_plan), "\n")
